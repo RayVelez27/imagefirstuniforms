@@ -204,6 +204,15 @@ IMPLEMENTATION NOTE: the header in Focal is pretty complex as it allows a lot of
     text-align: center;
     margin: 0 !important;
   }
+
+  /*
+    The logo link is `display:block; width:max-content` (theme.css), so it ignores
+    the parent's text-align:center and pins to the left edge. Auto side margins
+    center the block itself within the full-width logo cell.
+  */
+  .header--akima-gate .header__logo-link {
+    margin-inline: auto;
+  }
 </style>
 
 {%- comment -%}Akima Store password gate page (/pages/akima-store): show logo only, hide the rest of the nav{%- endcomment -%}
