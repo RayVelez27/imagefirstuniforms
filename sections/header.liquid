@@ -191,9 +191,18 @@ IMPLEMENTATION NOTE: the header in Focal is pretty complex as it allows a lot of
     display: none !important;
   }
 
+  /*
+    Center the logo on the gate page. The two nav columns are hidden above, so
+    the logo is the only visible item — make it span the row and center its
+    contents. margin/order are reset with !important to beat the equal-specificity
+    layout rules (e.g. logo_left_navigation_inline sets order:-1 + margin-right:40px
+    at >=1200px), which would otherwise shove it off-center.
+  */
   .header--akima-gate .header__logo {
-    text-align: center;
+    order: 0 !important;
     flex: 1 1 auto;
+    text-align: center;
+    margin: 0 !important;
   }
 </style>
 
@@ -270,7 +279,7 @@ IMPLEMENTATION NOTE: the header in Focal is pretty complex as it allows a lot of
 
       <!-- LOGO PART -->
       {%- capture logo -%}
-        <a class="header__logo-link" href="{{ routes.root_url }}">
+        <a class="header__logo-link" href="{% if is_akima_gate %}/pages/akima-store{% else %}{{ routes.root_url }}{% endif %}">
           {%- if section.settings.logo != blank -%}
             {%- assign logo_size = section.settings.logo_max_width | at_least: section.settings.mobile_logo_max_width | times: 2 %}
             <span class="visually-hidden">{{ shop.name }}</span>
@@ -564,7 +573,11 @@ SEARCH DRAWER - Only for logged-in users
   So while a gated visitor is in Akima Store mode, rewrite the logo link to the
   Akima Store collection ("home") so clicking it keeps them in the store instead
   of killing the session. Client-side only — see notes in sections/password-gate.liquid.
+
+  Skipped on the gate page itself (/pages/akima-store): there the logo must always
+  point back to the gate (set server-side above), so we don't rewrite it here.
 {%- endcomment -%}
+{%- unless is_akima_gate -%}
 <script>
   (function () {
     try {
@@ -574,6 +587,7 @@ SEARCH DRAWER - Only for logged-in users
     } catch (e) {}
   })();
 </script>
+{%- endunless -%}
 
 {%- comment -%}
   Akima Store mode: "Exit store" button handler (only present on the akima-store
