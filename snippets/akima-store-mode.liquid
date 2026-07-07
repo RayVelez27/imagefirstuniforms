@@ -101,6 +101,9 @@
   .akima-store-mode .header__akima-nav {
     display: inline-flex !important;
     align-items: center;
+    /* Breathing room to the right so the button isn't crowded against the nav
+       items (e.g. when a real account is logged in and the menu appears). */
+    margin-inline-end: 28px;
     gap: 6px;
     appearance: none;
     cursor: pointer;

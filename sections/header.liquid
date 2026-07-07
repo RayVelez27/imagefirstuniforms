@@ -215,15 +215,16 @@ IMPLEMENTATION NOTE: the header in Focal is pretty complex as it allows a lot of
   }
 
   /*
-    Akima Store mode on Akima routes (collection / its products / cart): hide the
-    logged-in account's "Home" and "Shop" nav items so the gated shopping nav isn't
-    mixed with the real store's navigation. The akima-store-mode class (on <html>,
-    set client-side) gates on "Akima mode active"; header--akima-route gates on the
-    route. data-item-title comes from snippets/desktop-menu.liquid; the `i` flag
-    makes the match case-insensitive.
+    Akima Store mode: hide the logged-in account's "Home" and "Shop" nav items
+    everywhere the mode is active — on ALL routes (akima-store collection/products,
+    cart, /account and its subroutes, contact, help, etc.), so the gated shopping
+    nav is never mixed with the real store's navigation. Gated only by the
+    akima-store-mode class (on <html>, set client-side), so regular visitors are
+    unaffected. data-item-title comes from snippets/desktop-menu.liquid; the `i`
+    flag makes the match case-insensitive.
   */
-  .akima-store-mode .header--akima-route .header__linklist-item[data-item-title="Home" i],
-  .akima-store-mode .header--akima-route .header__linklist-item[data-item-title="Shop" i] {
+  .akima-store-mode .header__linklist-item[data-item-title="Home" i],
+  .akima-store-mode .header__linklist-item[data-item-title="Shop" i] {
     display: none !important;
   }
 </style>
@@ -245,32 +246,7 @@ IMPLEMENTATION NOTE: the header in Focal is pretty complex as it allows a lot of
   {%- assign is_akima_home = true -%}
 {%- endif -%}
 
-{%- comment -%}
-  Akima Store routes: the akima-store collection, any product in that collection,
-  and the cart. On these routes, when Akima Store mode is active (client-side
-  akima-store-mode class), the logged-in account's "Home" and "Shop" nav items are
-  hidden (see the CSS above). Marked here with the header--akima-route class so the
-  hide only applies on these routes, not on every page of an Akima session.
-{%- endcomment -%}
-{%- assign is_akima_route = false -%}
-{%- if request.page_type == 'cart' -%}
-  {%- assign is_akima_route = true -%}
-{%- elsif is_akima_home -%}
-  {%- assign is_akima_route = true -%}
-{%- elsif request.page_type == 'product' -%}
-  {%- if collection.handle == 'akima-store' -%}
-    {%- assign is_akima_route = true -%}
-  {%- else -%}
-    {%- for c in product.collections -%}
-      {%- if c.handle == 'akima-store' -%}
-        {%- assign is_akima_route = true -%}
-        {%- break -%}
-      {%- endif -%}
-    {%- endfor -%}
-  {%- endif -%}
-{%- endif -%}
-
-<store-header {% if section.settings.enable_sticky_header %}sticky{% endif %} {% if request.page_type == 'index' and section.settings.enable_transparent_header %}transparent{% endif %} class="header {% if settings.background == settings.header_background %}header--bordered{% endif %} {% if request.page_type == 'index' and section.settings.enable_transparent_header %}header--transparent{% endif %} {% if is_akima_gate %}header--akima-gate{% endif %} {% if is_akima_route %}header--akima-route{% endif %}" role="banner">
+<store-header {% if section.settings.enable_sticky_header %}sticky{% endif %} {% if request.page_type == 'index' and section.settings.enable_transparent_header %}transparent{% endif %} class="header {% if settings.background == settings.header_background %}header--bordered{% endif %} {% if request.page_type == 'index' and section.settings.enable_transparent_header %}header--transparent{% endif %} {% if is_akima_gate %}header--akima-gate{% endif %}" role="banner">
   {%- assign menu = section.settings.navigation_menu -%}
 
   <div class="container">
