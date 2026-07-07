@@ -1,0 +1,123 @@
+{%- comment -%}
+  B2B Portal Auto-Redirect Snippet
+
+  This snippet automatically redirects customers from /pages/b2b-portal2 to their
+  tag-specific portal page. Include this in theme.liquid right after the <body> tag.
+
+  Logic:
+  - Only runs on page templates
+  - Checks if page handle is 'b2b-portal2'
+  - Gets customer's first valid tag (excluding 'manager' tags)
+  - Redirects to /pages/[tag-handle]
+{%- endcomment -%}
+
+{%- comment -%}Debug logging removed to prevent potential JSON serialization issues{%- endcomment -%}
+
+{%- if request.page_type == 'page' and request.path == '/pages/b2b-portal2' -%}
+  {%- if customer and customer.tags.size > 0 -%}
+    {%- comment -%} Check if user is disabled - if so, do not redirect {%- endcomment -%}
+    {%- assign is_disabled = false -%}
+    {%- for tag in customer.tags -%}
+      {%- assign tag_lower = tag | downcase -%}
+      {%- if tag_lower == 'disabled' -%}
+        {%- assign is_disabled = true -%}
+        {%- break -%}
+      {%- endif -%}
+    {%- endfor -%}
+
+    {%- unless is_disabled -%}
+      {%- comment -%} Check if user has "Limit" tag - if so, route to GFS USCIS collection {%- endcomment -%}
+      {%- assign is_limited_user = false -%}
+      {%- assign limit_redirect_url = nil -%}
+      {%- for tag in customer.tags -%}
+        {%- assign tag_lower = tag | downcase -%}
+        {%- if tag_lower == 'limit' -%}
+          {%- assign is_limited_user = true -%}
+          {%- break -%}
+        {%- endif -%}
+      {%- endfor -%}
+
+      {%- if is_limited_user -%}
+        {%- comment -%} Find GFS USCIS [State] tag and redirect to collection {%- endcomment -%}
+        {%- for tag in customer.tags -%}
+          {%- assign tag_lower = tag | downcase -%}
+          {%- if tag_lower contains 'gfs uscis' -%}
+            {%- assign tag_handle = tag | handle -%}
+            {%- assign limit_redirect_url = '/collections/' | append: tag_handle -%}
+            {%- break -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+
+      {%- if limit_redirect_url -%}
+        <script>
+          console.log('=== B2B REDIRECT DEBUG ===');
+          console.log('Customer tags:', {{ customer.tags | json }});
+          console.log('User has Limit tag - redirecting to GFS USCIS collection');
+          console.log('Redirecting to:', '{{ limit_redirect_url }}');
+          console.log('========================');
+
+          window.location.href = '{{ limit_redirect_url }}';
+        </script>
+      {%- else -%}
+      {%- comment -%} Standard page-based routing for non-Limit users {%- endcomment -%}
+      {%- assign valid_tags = "" -%}
+      {%- for tag in customer.tags -%}
+        {%- assign tag_lower = tag | downcase -%}
+        {%- unless tag_lower contains 'manager' -%}
+          {%- assign tag_handle = tag | handle -%}
+          {%- assign page_handle = pages[tag_handle].handle -%}
+          {%- if page_handle -%}
+            {%- if valid_tags == blank -%}
+              {%- assign valid_tags = page_handle -%}
+            {%- else -%}
+              {%- assign valid_tags = valid_tags | append: "," | append: page_handle -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endunless -%}
+      {%- endfor -%}
+
+      {%- if valid_tags != blank -%}
+        {%- assign valid_tags_array = valid_tags | split: "," -%}
+        {%- assign first_tag = valid_tags_array.first -%}
+        {%- assign redirect_url = '/pages/' | append: first_tag -%}
+
+        <script>
+          // B2B Portal Auto-Redirect - Debug
+          console.log('=== B2B REDIRECT DEBUG ===');
+          console.log('Customer tags:', {{ customer.tags | json }});
+          console.log('Valid page handles found:', '{{ valid_tags }}');
+          console.log('First tag:', '{{ first_tag }}');
+          console.log('Redirecting to:', '{{ redirect_url }}');
+          console.log('========================');
+
+          window.location.href = '{{ redirect_url }}';
+        </script>
+      {%- else -%}
+        <script>
+          console.log('=== B2B REDIRECT DEBUG ===');
+          console.log('Customer tags:', {{ customer.tags | json }});
+          console.log('ERROR: No valid page handles found for customer tags');
+          console.log('This means no pages exist with handles matching the customer tags');
+          console.log('========================');
+        </script>
+      {%- endif -%}
+      {%- endif -%}
+    {%- else -%}
+      <script>
+        console.log('=== B2B REDIRECT DEBUG ===');
+        console.log('Customer tags:', {{ customer.tags | json }});
+        console.log('User is DISABLED - staying on b2b-portal2 without redirect');
+        console.log('========================');
+      </script>
+    {%- endunless -%}
+  {%- else -%}
+    <script>
+      console.log('=== B2B REDIRECT DEBUG ===');
+      console.log('Customer logged in?', {{ customer | json }} !== null);
+      console.log('Customer tags count:', {% if customer %}{{ customer.tags.size }}{% else %}0{% endif %});
+      console.log('ERROR: Customer not logged in or has no tags');
+      console.log('========================');
+    </script>
+  {%- endif -%}
+{%- endif -%}

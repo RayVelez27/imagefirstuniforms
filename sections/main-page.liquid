@@ -1,0 +1,175 @@
+{%- comment -%} Check if this is the Akima page and user has Akima + Limit tags {%- endcomment -%}
+{%- assign is_akima_limit_user = false -%}
+{%- assign akima_location_tags = '' -%}
+
+{%- if page.handle == 'akima' and customer -%}
+  {%- assign has_akima_tag = false -%}
+  {%- assign has_limit_tag = false -%}
+  {%- for tag in customer.tags -%}
+    {%- assign tag_lower = tag | downcase | strip -%}
+    {%- if tag_lower == 'akima' -%}
+      {%- assign has_akima_tag = true -%}
+    {%- elsif tag_lower == 'limit' -%}
+      {%- assign has_limit_tag = true -%}
+    {%- else -%}
+      {%- comment -%} Check if tag starts with "akima " (a location sub-tag) {%- endcomment -%}
+      {%- assign tag_prefix = tag_lower | slice: 0, 6 -%}
+      {%- if tag_prefix == 'akima ' -%}
+        {%- if akima_location_tags == '' -%}
+          {%- assign akima_location_tags = tag -%}
+        {%- else -%}
+          {%- assign akima_location_tags = akima_location_tags | append: '|||' | append: tag -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- if has_akima_tag and has_limit_tag -%}
+    {%- assign is_akima_limit_user = true -%}
+  {%- endif -%}
+{%- endif -%}
+
+{%- if is_akima_limit_user -%}
+  {%- comment -%} Akima + Limit user: show location-based collections dynamically from tags {%- endcomment -%}
+  <section>
+    <div class="container">
+      <header class="page-header">
+        <div class="page-header__text-wrapper">
+          <h1 class="heading h2">Akima</h1>
+        </div>
+      </header>
+
+      <div class="page-content page-content--large">
+        <div class="akima-collections">
+          {%- if akima_location_tags == '' -%}
+            <p>No collections are assigned to your account. Please contact your manager.</p>
+          {%- else -%}
+            {%- assign location_tags_array = akima_location_tags | split: '|||' -%}
+            {%- for location_tag in location_tags_array -%}
+              {%- assign tag_stripped = location_tag | strip -%}
+              {%- comment -%} Remove "Akima " prefix to get display name {%- endcomment -%}
+              {%- assign display_name = tag_stripped | slice: 6, 200 -%}
+              {%- comment -%} Build collection handle from full tag: "Akima Testing" → "akima-testing" {%- endcomment -%}
+              {%- assign collection_handle = tag_stripped | downcase | replace: ' ', '-' -%}
+              <a href="/collections/{{ collection_handle }}" class="akima-collection-card">
+                <div class="akima-collection-card__content">
+                  <h2 class="heading h4">{{ display_name }}</h2>
+                  <span class="akima-collection-card__cta">Shop Now &rarr;</span>
+                </div>
+              </a>
+            {%- endfor -%}
+          {%- endif -%}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <style>
+    .akima-collections {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 24px;
+      margin-top: 20px;
+    }
+
+    .akima-collection-card {
+      display: block;
+      border: 1px solid rgba(var(--text-color), 0.12);
+      border-radius: 4px;
+      padding: 40px 30px;
+      text-decoration: none;
+      color: rgb(var(--text-color));
+      transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+
+    .akima-collection-card:hover {
+      border-color: rgba(var(--text-color), 0.3);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .akima-collection-card__content {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .akima-collection-card__cta {
+      font-size: 14px;
+      opacity: 0.7;
+    }
+
+    .akima-collection-card:hover .akima-collection-card__cta {
+      opacity: 1;
+    }
+  </style>
+
+{%- else -%}
+  {%- comment -%} Normal page content for everyone else {%- endcomment -%}
+  <section>
+    <div class="container">
+      <div class="page-header">
+        <nav aria-label="{{ 'general.breadcrumb.title' | t }}" class="breadcrumb breadcrumb--floating text--xsmall hidden-phone">
+          <ol class="breadcrumb__list" role="list">
+            <li class="breadcrumb__item">
+              <a class="breadcrumb__link" href="{{ routes.root_url }}">{{ 'general.breadcrumb.home' | t }}</a>
+            </li>
+
+            <li class="breadcrumb__item">
+              <span class="breadcrumb__link" aria-current="page">{{ page.title }}</span>
+            </li>
+          </ol>
+        </nav>
+
+        <div class="page-header__text-wrapper text-container">
+          {%- if section.settings.show_title -%}
+            <h1 class="heading h2">{{ page.title }}</h1>
+          {%- endif -%}
+
+          {%- if template.suffix contains 'contact' or template.suffix contains 'faq' -%}
+            {{- page.content -}}
+          {%- endif -%}
+        </div>
+      </div>
+
+      {%- unless template.suffix contains 'contact' or template.suffix contains 'faq' -%}
+        <div class="page-content page-content--{{ section.settings.page_width }} rte">
+          {{- page.content -}}
+        </div>
+      {%- endunless -%}
+    </div>
+  </section>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Page",
+  "class": "shopify-section--main-page",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "show_title",
+      "label": "Show page title",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "page_width",
+      "label": "Page width",
+      "options": [
+        {
+          "value": "small",
+          "label": "Small"
+        },
+        {
+          "value": "medium",
+          "label": "Medium"
+        },
+        {
+          "value": "large",
+          "label": "Large"
+        }
+      ],
+      "default": "medium"
+    }
+  ]
+}
+{% endschema %}

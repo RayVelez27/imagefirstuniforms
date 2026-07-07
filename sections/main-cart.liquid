@@ -1,0 +1,2351 @@
+{%- comment -%}Check if customer has Limit tag for quantity restriction{%- endcomment -%}
+{%- assign is_limited_customer = false -%}
+{%- assign is_bulk_order_customer = false -%}
+{%- assign is_akima_customer = false -%}
+{%- assign is_manager_extended = false -%}
+{%- if customer -%}
+  {%- assign has_limit_tag = false -%}
+  {%- assign has_bls_tag = false -%}
+  {%- assign has_akima_tag = false -%}
+  {%- assign has_manager_tag = false -%}
+  {%- assign has_extended_tag = false -%}
+  {%- for tag in customer.tags -%}
+    {%- assign tag_lower = tag | downcase | strip -%}
+    {%- if tag_lower == 'limit' -%}
+      {%- assign has_limit_tag = true -%}
+    {%- endif -%}
+    {%- if tag_lower == 'blue life security' -%}
+      {%- assign has_bls_tag = true -%}
+    {%- endif -%}
+    {%- if tag_lower == 'akima' -%}
+      {%- assign has_akima_tag = true -%}
+    {%- endif -%}
+    {%- if tag_lower == 'manager' -%}
+      {%- assign has_manager_tag = true -%}
+    {%- endif -%}
+    {%- if tag_lower == 'extended' -%}
+      {%- assign has_extended_tag = true -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- if has_limit_tag -%}
+    {%- assign is_limited_customer = true -%}
+  {%- endif -%}
+  {%- if has_limit_tag and has_bls_tag -%}
+    {%- assign is_bulk_order_customer = true -%}
+  {%- endif -%}
+  {%- if has_limit_tag and has_akima_tag -%}
+    {%- assign is_akima_customer = true -%}
+  {%- endif -%}
+  {%- if has_manager_tag and has_extended_tag -%}
+    {%- assign is_manager_extended = true -%}
+  {%- endif -%}
+  {%- assign has_akima_company_tag = false -%}
+  {%- for tag in customer.tags -%}
+    {%- assign tag_lower = tag | downcase | strip -%}
+    {%- assign tag_prefix = tag_lower | slice: 0, 6 -%}
+    {%- if tag_prefix == 'akima ' -%}
+      {%- assign has_akima_company_tag = true -%}
+      {%- break -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- assign is_akima_company_customer = false -%}
+  {%- if has_akima_tag and has_limit_tag and has_akima_company_tag -%}
+    {%- assign is_akima_company_customer = true -%}
+  {%- endif -%}
+{%- endif -%}
+
+{%- comment -%}Detect customer company for per-company billing address{%- endcomment -%}
+{%- assign customer_company_slug = '' -%}
+{%- if has_bls_tag -%}
+  {%- assign customer_company_slug = 'blue-life-security' -%}
+{%- elsif has_akima_tag -%}
+  {%- assign customer_company_slug = 'akima' -%}
+{%- else -%}
+  {%- for tag in customer.tags -%}
+    {%- assign tag_lower = tag | downcase | strip -%}
+    {%- if tag_lower contains 'gfs' and tag_lower contains 'uscis' -%}
+      {%- assign customer_company_slug = 'gfs-uscis' -%}
+      {%- break -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+
+{%- comment -%}Apply add-to-cart limits only for Limit customers who are NOT bulk order or Akima company customers{%- endcomment -%}
+{%- assign apply_add_to_cart_limits = false -%}
+{%- if is_limited_customer and is_bulk_order_customer == false and is_akima_company_customer == false -%}
+  {%- assign apply_add_to_cart_limits = true -%}
+{%- endif -%}
+
+<section>
+  <div class="container container--medium">
+    {%- if cart.item_count > 0 -%}
+      <div class="page-header">
+        <div class="page-header__text-wrapper text-container">
+          <h1 class="heading h2">{{ 'cart.general.title' | t }}</h1>
+
+          {%- if settings.cart_show_free_shipping_threshold and settings.cart_free_shipping_threshold != '' and cart.requires_shipping -%}
+            {%- assign free_shipping_thresholds = settings.cart_free_shipping_threshold | remove: ' ' | split: ',' -%}
+            {%- assign has_found_matching_threshold = false -%}
+
+            {%- if free_shipping_thresholds.size > 1 -%}
+              {%- for threshold in free_shipping_thresholds -%}
+                {%- assign threshold_parts = threshold | split: ':' -%}
+                {%- assign currency_code = threshold_parts | first | upcase -%}
+
+                {%- if currency_code == cart.currency.iso_code -%}
+                  {%- assign free_shipping_calculated_threshold = threshold_parts | last -%}
+                  {%- assign has_found_matching_threshold = true -%}
+                  {%- break -%}
+                {%- endif -%}
+              {%- endfor -%}
+            {%- else -%}
+              {%- assign free_shipping_calculated_threshold = free_shipping_thresholds | last -%}
+              {%- assign has_found_matching_threshold = true -%}
+            {%- endif -%}
+
+            {%- if has_found_matching_threshold -%}
+              {%- assign threshold_in_cents = free_shipping_calculated_threshold | times: 100 -%}
+
+              {%- assign calculated_total_price = cart.total_price -%}
+
+              {%- for line_item in cart.items -%}
+                {%- unless line_item.requires_shipping -%}
+                  {%- assign calculated_total_price = calculated_total_price | minus: line_item.final_line_price -%}
+                {%- endunless -%}
+              {%- endfor -%}
+
+              {% comment %}We have to remove the cart level discount from the calculated amount{% endcomment %}
+              {%- assign total_cart_discount = 0 -%}
+
+              {%- for discount_application in cart.cart_level_discount_applications -%}
+                {%- assign total_cart_discount = total_cart_discount | plus: discount_application.total_allocated_amount -%}
+              {%- endfor -%}
+
+              {%- assign calculated_total_price = calculated_total_price | minus: total_cart_discount -%}
+
+              <free-shipping-bar threshold="{{ threshold_in_cents }}" class="shipping-bar shipping-bar--large" style="--progress: {{ calculated_total_price | times: 1.0 | divided_by: threshold_in_cents | at_most: 1 }}">
+                {%- if calculated_total_price >= threshold_in_cents -%}
+                  <span class="shipping-bar__text">{{ 'cart.general.free_shipping' | t }}</span>
+                {%- else -%}
+                  {%- capture remaining_amount -%}{{ calculated_total_price | minus: threshold_in_cents | abs | money }}{%- endcapture -%}
+                  <span class="shipping-bar__text">{{ 'cart.general.free_shipping_remaining_html' | t: remaining_amount: remaining_amount }}</span>
+                {%- endif -%}
+
+                <span class="shipping-bar__progress"></span>
+              </free-shipping-bar>
+            {%- endif -%}
+          {%- endif -%}
+        </div>
+      </div>
+    {%- else -%}
+      <div class="empty-state text-container">
+        <h1 class="heading h1">{{ 'cart.general.title' | t }}</h1>
+        <p class="text--large">{{ 'cart.general.empty' | t }}</p>
+      </div>
+    {%- endif -%}
+
+    {%- if cart.item_count > 0 -%}
+      <div class="page-content page-content--fluid">
+        <div class="cart">
+          <div class="cart__content">
+            <table class="line-item-table table table--loose">
+              <thead class="line-item-table__header-group hidden-phone">
+                <tr>
+                  <th><span class="heading heading--xsmall text--subdued">{{ 'cart.general.product' | t }}</span></th>
+                  {%- if is_bulk_order_customer -%}
+                    <th><span class="heading heading--xsmall text--subdued text--center">Ordered For</span></th>
+                  {%- endif -%}
+                  <th><span class="heading heading--xsmall text--subdued text--center">{{ 'cart.general.quantity' | t }}</span></th>
+                  <th><span class="heading heading--xsmall text--subdued text--right">{{ 'cart.general.total' | t }}</span></th>
+                </tr>
+              </thead>
+
+              <tbody class="line-item-table__list">
+                {%- for line_item in cart.items -%}
+                  <tr class="line-item">
+                    <td class="line-item__product">
+                      <div class="line-item__content-wrapper">
+                        {%- if line_item.image != blank -%}
+                          <a href="{{ line_item.url }}" class="line-item__image-wrapper" tabindex="-1" aria-hidden="true">
+                            {{- line_item.image | image_url: width: line_item.image.width | image_tag: loading: 'lazy', sizes: '(max-width: 740px) 80px, 92px', widths: '80,92,160,184,240,276', class: 'line-item__image' -}}
+                          </a>
+                        {%- endif -%}
+
+                        {%- capture unit_price -%}
+                          {%- if line_item.unit_price_measurement -%}
+                            <div class="price text--subdued">
+                              <div class="unit-price-measurement">
+                                <span class="unit-price-measurement__price">{{ line_item.unit_price | money }}</span>
+                                <span class="unit-price-measurement__separator">/</span>
+
+                                {%- if line_item.unit_price_measurement.reference_value != 1 -%}
+                                  <span class="unit-price-measurement__reference-value">{{ line_item.unit_price_measurement.reference_value }}</span>
+                                {%- endif -%}
+
+                                <span class="unit-price-measurement__reference-unit">{{ line_item.unit_price_measurement.reference_unit }}</span>
+                              </div>
+                            </div>
+                          {%- endif -%}
+                        {%- endcapture -%}
+
+                        {%- capture price -%}
+                          <span class="price">
+                            <span class="visually-hidden">{{ 'product.general.sale_price' | t }}</span>
+
+                            {%- if line_item.original_price == 0 -%}
+                              {{- 'cart.general.free' | t -}}
+                            {%- else -%}
+                              {{- line_item.original_price | money -}}
+                            {%- endif -%}
+                          </span>
+                        {%- endcapture -%}
+
+                        {%- capture line_price -%}
+                          <span class="price {% if line_item.original_line_price > line_item.final_line_price or line_item.final_line_price == 0 or line_item.variant.compare_at_price > line_item.variant.price %}price--highlight{% endif %}">
+                            <span class="visually-hidden">{{ 'product.general.sale_price' | t }}</span>
+
+                            {%- if line_item.final_line_price == 0 -%}
+                              {{- 'cart.general.free' | t -}}
+                            {%- else -%}
+                              {{- line_item.final_line_price | money -}}
+                            {%- endif -%}
+                          </span>
+
+                          {%- if line_item.original_line_price > line_item.final_line_price or line_item.variant.compare_at_price > line_item.variant.price -%}
+                            <span class="price price--compare">
+                              <span class="visually-hidden">{{ 'product.general.regular_price' | t }}</span>
+
+                              {%- if line_item.original_line_price > line_item.final_line_price -%}
+                                {{- line_item.original_line_price | money -}}
+                              {%- else -%}
+                                {{- line_item.variant.compare_at_price | times: line_item.quantity | money -}}
+                              {%- endif -%}
+                            </span>
+                          {%- endif -%}
+                        {%- endcapture -%}
+
+                        <div class="line-item__info">
+                          <div class="product-item-meta">
+                            {%- if settings.show_vendor -%}
+                              {%- assign vendor_handle = line_item.vendor | handle -%}
+                              {%- assign collection_for_vendor = collections[vendor_handle] -%}
+
+                              {%- unless collection_for_vendor.empty? -%}
+                                <a class="product-item-meta__vendor heading heading--xxsmall" href="{{ collection_for_vendor.url }}">{{ line_item.vendor }}</a>
+                              {%- else -%}
+                                <a class="product-item-meta__vendor heading heading--xxsmall" href="{{ line_item.vendor | url_for_vendor }}">{{ line_item.vendor }}</a>
+                              {%- endunless -%}
+                            {%- endif -%}
+
+                            <a href="{{ line_item.url }}" class="product-item-meta__title text--small hidden-tablet-and-up">{{ line_item.product.title }}</a>
+                            <a href="{{ line_item.url }}" class="product-item-meta__title hidden-phone">{{ line_item.product.title }}</a>
+
+                            {%- capture line_item_properties -%}
+                              {%- unless line_item.product.has_only_default_variant -%}
+                                <span class="product-item-meta__property text--subdued text--xsmall">{{ line_item.variant.title }}</span>
+                              {%- endunless -%}
+
+                              {%- if line_item.selling_plan_allocation -%}
+                                <span class="product-item-meta__property text--subdued text--xsmall">{{ line_item.selling_plan_allocation.selling_plan.name }}</span>
+                              {%- endif -%}
+
+                              {%- unless line_item.properties == blank -%}
+                                <ul class="product-item-meta__property list--unstyled text--subdued text--xsmall" role="list">
+                                  {%- for property in line_item.properties -%}
+                                    {%- assign first_character_in_key = property.first | truncate: 1, '' -%}
+
+                                    {%- if property.last == blank or first_character_in_key == '_' -%}
+                                      {%- continue -%}
+                                    {%- endif -%}
+
+                                    <li class="line-item__property">{{ property.first }}: {{ property.last }}</li>
+                                  {%- endfor -%}
+                                </ul>
+                              {%- endunless -%}
+                            {%- endcapture -%}
+
+                            {%- if line_item_properties != blank -%}
+                              <div class="product-item-meta__property-list">
+                                {{- line_item_properties -}}
+                              </div>
+                            {%- endif -%}
+
+                            {%- if is_bulk_order_customer -%}
+                              {%- for property in line_item.properties -%}
+                                {%- if property.first == 'Ordered For' and property.last != blank -%}
+                                  <div class="line-item__ordered-for-mobile hidden-tablet-and-up">
+                                    <span class="text--subdued text--xsmall">Ordered for:</span>
+                                    <span class="text--xsmall text--strong">{{ property.last }}</span>
+                                  </div>
+                                {%- endif -%}
+                              {%- endfor -%}
+                            {%- endif -%}
+
+                            <div class="product-item-meta__price-list-container">
+                              <div class="price-list text--small hidden-tablet-and-up">
+                                {{- line_price -}}
+                                {{- unit_price -}}
+                              </div>
+
+                              <div class="price-list hidden-phone">
+                                {{- price -}}
+                                {{- unit_price -}}
+                              </div>
+                            </div>
+                          </div>
+
+                          {%- if line_item.line_level_discount_allocations != blank -%}
+                            <ul class="line-item__discount-list list--unstyled" role="list">
+                              {%- for discount_allocation in line_item.line_level_discount_allocations -%}
+                                <li class="line-item__discount-badge discount-badge">
+                                  {%- render 'icon' with 'discount-badge' -%}{{ discount_allocation.discount_application.title }} (-{{ discount_allocation.amount | money }})
+                                </li>
+                              {%- endfor -%}
+                            </ul>
+                          {%- endif -%}
+
+                          {% liquid
+                            assign max_quantity = ''
+                            assign variant = line_item.variant
+                      
+                            if variant.inventory_management != blank and variant.inventory_policy == 'deny'
+                              assign current_quantity_for_variant = cart | item_count_for_variant: variant.id
+                              assign max_quantity = variant.inventory_quantity | minus: current_quantity_for_variant | plus: line_item.quantity
+                            endif
+                      
+                            if variant.quantity_rule.max != nil
+                              assign max_quantity = max_quantity | default: 999999 | at_most: variant.quantity_rule.max
+                            endif
+                          %}
+
+                          {%- capture quantity_selector_inner -%}
+                            {%- if apply_add_to_cart_limits -%}
+                              {%- comment -%}Limited customer: show quantity as read-only, no +/- buttons{%- endcomment -%}
+                              <div class="quantity-selector quantity-selector--small quantity-selector--limited">
+                                <input is="input-number" class="quantity-selector__input text--xsmall" autocomplete="off" type="number" inputmode="numeric" name="updates[]" data-line="{{ forloop.index }}" value="{{ line_item.quantity }}" min="{{ line_item.quantity }}" max="{{ line_item.quantity }}" readonly size="{{ line_item.quantity | append: '' | size | at_least: 2 }}" aria-label="{{ 'cart.general.change_quantity' | t | escape }}">
+                              </div>
+                            {%- else -%}
+                              <div class="quantity-selector quantity-selector--small">
+                                <a href="{{ routes.cart_change_url }}?quantity={{ line_item.quantity | minus: line_item.variant.quantity_rule.increment | at_least: line_item.variant.quantity_rule.min }}&line={{ forloop.index }}" class="quantity-selector__button" aria-label="{{ 'cart.general.decrease_quantity' | t | escape }}" data-no-instant>
+                                  {% render 'icon' with 'minus' %}
+                                </a>
+
+                                <input is="input-number" class="quantity-selector__input text--xsmall" autocomplete="off" type="number" inputmode="numeric" name="updates[]" data-line="{{ forloop.index }}" value="{{ line_item.quantity }}" {% if max_quantity != '' %}max="{{ max_quantity }}"{% endif %} size="{{ line_item.quantity | append: '' | size | at_least: 2 }}" aria-label="{{ 'cart.general.change_quantity' | t | escape }}">
+
+                                {%- if max_quantity == blank or line_item.quantity < max_quantity -%}
+                                  {% assign increment = line_item.quantity | plus: line_item.variant.quantity_rule.increment %}
+
+                                  {%- if line_item.variant.quantity_rule.max != nil -%}
+                                    {%- assign increment = increment | at_most: line_item.variant.quantity_rule.max -%}
+                                  {%- endif -%}
+
+                                  <a href="{{ routes.cart_change_url }}?quantity={{ increment }}&line={{ forloop.index }}" class="quantity-selector__button" aria-label="{{ 'cart.general.increase_quantity' | t | escape }}" data-no-instant>
+                                    {%- render 'icon' with 'plus' -%}
+                                  </a>
+                                {%- else -%}
+                                  <span class="quantity-selector__button" aria-label="{{ 'cart.general.no_more_stock' | t | escape }}" data-tooltip="{{ 'cart.general.no_more_stock' | t | escape }}">
+                                    {%- render 'icon' with 'plus' -%}
+                                  </span>
+                                {%- endif -%}
+                              </div>
+                            {%- endif -%}
+
+                            <a href="{{ line_item.url_to_remove }}" class="line-item__remove-button link text--subdued text--xxsmall hidden-tablet-and-up" data-no-instant>{{ 'cart.general.remove' | t }}</a>
+                            <a href="{{ line_item.url_to_remove }}" class="line-item__remove-button link text--subdued text--xsmall hidden-phone" data-no-instant>{{ 'cart.general.remove' | t }}</a>
+                          {%- endcapture -%}
+
+                          <line-item-quantity class="line-item__quantity hidden-tablet-and-up">
+                            {{- quantity_selector_inner -}}
+                          </line-item-quantity>
+                        </div>
+                      </div>
+                    </td>
+
+                    {%- if is_bulk_order_customer -%}
+                      <td class="line-item__ordered-for text--center hidden-phone">
+                        {%- if settings.show_vendor -%}
+                          <span class="product-item-meta__vendor heading heading--xxsmall" style="visibility: hidden">x</span>
+                        {%- endif -%}
+                        <span class="line-item__ordered-for-name">
+                          {%- for property in line_item.properties -%}
+                            {%- if property.first == 'Ordered For' -%}
+                              {{ property.last }}
+                            {%- endif -%}
+                          {%- endfor -%}
+                        </span>
+                      </td>
+                    {%- endif -%}
+
+                    <td class="line-item__quantity line-item__quantity--block text--center hidden-phone">
+                      {%- if settings.show_vendor -%}
+                        {%- comment -%}
+                          IMPLEMENTATION NOTE: in the design, the price is aligned in regards of the product title (not the brand). It was a
+                          bit hard to do as we cannot set a fixed margin, so I am actually adding an empty vendor to simulate the same height
+                        {%- endcomment -%}
+                        <span class="product-item-meta__vendor heading heading--xxsmall" style="visibility: hidden">x</span>
+                      {%- endif -%}
+
+                      <line-item-quantity style="display: block; margin-top: -4px">
+                        {{ quantity_selector_inner }}
+                      </line-item-quantity>
+                    </td>
+
+                    <td class="line-item__price-list-container text--right hidden-phone">
+                      {%- if settings.show_vendor -%}
+                        {%- comment -%}
+                          IMPLEMENTATION NOTE: in the design, the price is aligned in regards of the product title (not the brand). It was a
+                          bit hard to do as we cannot set a fixed margin, so I am actually adding an empty vendor to simulate the same height
+                        {%- endcomment -%}
+                        <span class="product-item-meta__vendor heading heading--xxsmall" style="visibility: hidden">x</span>
+                      {%- endif -%}
+
+                      <div class="price-list price-list--stack">
+                        {{- line_price -}}
+                      </div>
+                    </td>
+                  </tr>
+                {%- endfor -%}
+              </tbody>
+            </table>
+
+            {%- if is_bulk_order_customer -%}
+            <style>
+              .cart-person-group-header td {
+                padding: 1.5rem 0 0.5rem;
+                border-top: 1px solid #ddd;
+                border-bottom: 1px solid #ddd;
+              }
+              .cart-person-group-header__name {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                font-weight: 700;
+                font-size: 0.9375rem;
+                color: #192674;
+              }
+              .cart-person-group-header__count {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 22px;
+                height: 22px;
+                padding: 0 7px;
+                border-radius: 11px;
+                background: #192674;
+                color: white;
+                font-size: 0.75rem;
+                font-weight: 700;
+              }
+              .cart-person-group-header:first-child td {
+                padding-top: 0;
+              }
+              .line-item-table__list {
+                padding-top: 0;
+              }
+            </style>
+
+            <script>
+              document.addEventListener('DOMContentLoaded', function() {
+                var tbody = document.querySelector('.line-item-table__list');
+                if (!tbody) return;
+
+                var rows = Array.from(tbody.querySelectorAll('tr.line-item'));
+                if (rows.length === 0) return;
+
+                // Reverse rows so oldest (added first) is on top
+                rows.reverse();
+
+                // Extract person name from each row
+                function getPersonName(row) {
+                  var nameEl = row.querySelector('.line-item__ordered-for-name');
+                  if (nameEl) return nameEl.textContent.trim();
+                  // Fallback: check mobile version
+                  var mobileEl = row.querySelector('.line-item__ordered-for-mobile .text--strong');
+                  if (mobileEl) return mobileEl.textContent.trim();
+                  return '';
+                }
+
+                // Build ordered list of unique names (first-seen order = oldest first)
+                var nameOrder = [];
+                var groupedRows = {};
+                rows.forEach(function(row) {
+                  var name = getPersonName(row);
+                  if (!name) name = '(No name)';
+                  if (nameOrder.indexOf(name) === -1) {
+                    nameOrder.push(name);
+                    groupedRows[name] = [];
+                  }
+                  groupedRows[name].push(row);
+                });
+
+                // Get column count for the header row colspan
+                var headerRow = document.querySelector('.line-item-table__header-group tr');
+                var colCount = headerRow ? headerRow.children.length : 4;
+
+                // Clear tbody and re-insert rows grouped by name
+                tbody.innerHTML = '';
+
+                nameOrder.forEach(function(name) {
+                  // Insert group header row
+                  var headerTr = document.createElement('tr');
+                  headerTr.className = 'cart-person-group-header';
+                  var headerTd = document.createElement('td');
+                  headerTd.colSpan = colCount;
+
+                  var itemCount = 0;
+                  groupedRows[name].forEach(function(row) {
+                    var qtyInput = row.querySelector('input[name="updates[]"]');
+                    itemCount += qtyInput ? parseInt(qtyInput.value) || 1 : 1;
+                  });
+
+                  headerTd.innerHTML = '<span class="cart-person-group-header__name">' +
+                    name +
+                    ' <span class="cart-person-group-header__count">' + itemCount + '</span>' +
+                    '</span>';
+                  headerTr.appendChild(headerTd);
+                  tbody.appendChild(headerTr);
+
+                  // Insert all rows for this person
+                  groupedRows[name].forEach(function(row) {
+                    tbody.appendChild(row);
+                  });
+                });
+              });
+            </script>
+            {%- endif -%}
+
+            {%- assign items_requiring_shipping = cart.items | where: 'requires_shipping' -%}
+
+            {%- comment -%}Cart Attributes: Special Instructions and PO Number{%- endcomment -%}
+            <div class="cart-attributes">
+              <div class="cart-attributes__fields">
+                <div class="cart-attributes__field">
+                  <label class="cart-attributes__label" for="cart-special-instructions">
+                    Special Instructions
+                  </label>
+                  <textarea
+                    id="cart-special-instructions"
+                    name="note"
+                    class="cart-attributes__textarea"
+                    rows="3"
+                    placeholder="Enter any special instructions for your order"
+                  >{{ cart.note }}</textarea>
+                </div>
+
+                {%- unless is_bulk_order_customer or has_akima_tag -%}
+                <div class="cart-attributes__field cart-attributes__field--po">
+                  <label class="cart-attributes__label" for="cart-po-number">
+                    PO Number{% if is_limited_customer %} <span class="cart-attributes__readonly-badge">(Auto-filled)</span>{% endif %}
+                  </label>
+                  <input
+                    type="text"
+                    id="cart-po-number"
+                    name="attributes[PO Number]"
+                    class="cart-attributes__input{% if is_limited_customer %} cart-attributes__input--readonly{% endif %}"
+                    value="{{ cart.attributes['PO Number'] }}"
+                    placeholder="Enter your PO number"
+                    {% if is_limited_customer %}readonly{% endif %}
+                  >
+                </div>
+                {%- endunless -%}
+
+                {%- if has_akima_tag -%}
+                <div class="cart-attributes__field">
+                  <label class="cart-attributes__label" for="cart-project-number">Project Number</label>
+                  <input
+                    type="text"
+                    id="cart-project-number"
+                    name="attributes[Project Number]"
+                    class="cart-attributes__input"
+                    value="{{ cart.attributes['Project Number'] }}"
+                    placeholder="Enter your project number"
+                  >
+                </div>
+                <div class="cart-attributes__field">
+                  <label class="cart-attributes__label" for="cart-gl-account">G/L Account</label>
+                  <input
+                    type="text"
+                    id="cart-gl-account"
+                    name="attributes[G/L Account]"
+                    class="cart-attributes__input"
+                    value="{{ cart.attributes['G/L Account'] }}"
+                    placeholder="Enter your G/L account"
+                  >
+                </div>
+                {%- endif -%}
+              </div>
+            </div>
+
+            <style>
+              .cart-attributes {
+                margin-bottom: 2rem;
+                padding: 1.5rem;
+                background-color: rgb(var(--background));
+                border: 1px solid rgb(var(--border-color));
+                border-radius: var(--border-radius);
+              }
+
+              .cart-attributes__fields {
+                display: flex;
+                flex-direction: column;
+                gap: 1.25rem;
+              }
+
+              .cart-attributes__field {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+              }
+
+              .cart-attributes__label {
+                font-weight: 600;
+                font-size: 0.875rem;
+                color: rgb(var(--text-color));
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+              }
+
+              .cart-attributes__input,
+              .cart-attributes__textarea {
+                width: 100%;
+                padding: 0.75rem;
+                border: 1px solid rgb(var(--border-color));
+                border-radius: var(--border-radius);
+                background-color: rgb(var(--background));
+                color: rgb(var(--text-color));
+                font-size: 0.9375rem;
+                font-family: inherit;
+                transition: border-color 0.2s;
+              }
+
+              .cart-attributes__input:focus,
+              .cart-attributes__textarea:focus {
+                outline: none;
+                border-color: rgb(var(--text-color));
+                box-shadow: 0 0 0 1px rgb(var(--text-color));
+              }
+
+              .cart-attributes__textarea {
+                resize: vertical;
+                min-height: 80px;
+              }
+
+              .cart-attributes__input--readonly {
+                background-color: #f5f5f5;
+                color: #666;
+                cursor: not-allowed;
+                border-color: #ddd;
+              }
+
+              .cart-attributes__input--readonly:focus {
+                outline: none;
+                box-shadow: none;
+                border-color: #ddd;
+              }
+
+              .cart-attributes__readonly-badge {
+                font-weight: 400;
+                font-size: 0.75rem;
+                color: #888;
+                text-transform: none;
+                letter-spacing: normal;
+              }
+
+              /* Ordered For column (bulk order customers) */
+              .line-item__ordered-for {
+                vertical-align: middle;
+              }
+
+              .line-item__ordered-for-name {
+                font-weight: 600;
+                font-size: 0.9375rem;
+                color: rgb(var(--text-color));
+              }
+
+              .line-item__ordered-for-mobile {
+                display: flex;
+                gap: 0.35rem;
+                align-items: center;
+                margin-top: 0.35rem;
+              }
+
+              .text--strong {
+                font-weight: 600;
+              }
+
+              @media (max-width: 768px) {
+                .cart-attributes {
+                  padding: 1rem;
+                  margin-bottom: 1.5rem;
+                }
+
+                .cart-attributes__fields {
+                  gap: 1rem;
+                }
+              }
+            </style>
+
+            <script>
+              (function() {
+                if (typeof window.CartAttributesInitialized !== 'undefined') return;
+                window.CartAttributesInitialized = true;
+
+                document.addEventListener('DOMContentLoaded', function() {
+                  const specialInstructionsField = document.getElementById('cart-special-instructions');
+                  const poNumberField = document.getElementById('cart-po-number');
+
+                  if (specialInstructionsField) {
+                    let specialInstructionsTimeout;
+                    specialInstructionsField.addEventListener('input', function() {
+                      clearTimeout(specialInstructionsTimeout);
+                      specialInstructionsTimeout = setTimeout(function() {
+                        updateCartAttribute('note', specialInstructionsField.value);
+                      }, 1000);
+                    });
+                  }
+
+                  if (poNumberField) {
+                    let poNumberTimeout;
+                    poNumberField.addEventListener('input', function() {
+                      clearTimeout(poNumberTimeout);
+                      poNumberTimeout = setTimeout(function() {
+                        updateCartAttribute('attributes[PO Number]', poNumberField.value);
+                      }, 1000);
+                    });
+                  }
+
+                  const projectNumberField = document.getElementById('cart-project-number');
+                  const glAccountField = document.getElementById('cart-gl-account');
+
+                  if (projectNumberField) {
+                    let projectNumberTimeout;
+                    projectNumberField.addEventListener('input', function() {
+                      clearTimeout(projectNumberTimeout);
+                      projectNumberTimeout = setTimeout(function() {
+                        updateCartAttribute('attributes[Project Number]', projectNumberField.value);
+                      }, 1000);
+                    });
+                  }
+
+                  if (glAccountField) {
+                    let glAccountTimeout;
+                    glAccountField.addEventListener('input', function() {
+                      clearTimeout(glAccountTimeout);
+                      glAccountTimeout = setTimeout(function() {
+                        updateCartAttribute('attributes[G/L Account]', glAccountField.value);
+                      }, 1000);
+                    });
+                  }
+
+                  window.updateCartAttribute = function(name, value) {
+                    const formData = new FormData();
+                    formData.append(name, value);
+
+                    fetch('/cart/update.js', {
+                      method: 'POST',
+                      body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                      console.log('Cart attribute updated:', name, value);
+                    })
+                    .catch(error => {
+                      console.error('Error updating cart attribute:', error);
+                    });
+                  };
+                });
+              })();
+            </script>
+
+            {%- comment -%}Hide shipping estimator for Limit customers{%- endcomment -%}
+            {%- if section.settings.show_shipping_estimator and items_requiring_shipping.size > 0 and is_limited_customer == false -%}
+              <div class="shipping-estimator">
+                <button type="button" is="toggle-button" class="shipping-estimator__toggle-button collapsible-toggle heading heading--small" aria-controls="shipping-estimator" aria-expanded="false">
+                  {{- 'cart.shipping_estimator.estimate_shipping' | t -}}
+                  {%- render 'icon' with 'chevron' -%}
+                </button>
+
+                <collapsible-content id="shipping-estimator" class="collapsible">
+                  <shipping-estimator class="shipping-estimator__form" role="form">
+                    <div class="input-row">
+                      <div class="input">
+                        <label class="input__block-label" for="shipping-estimator[country]">{{ 'cart.shipping_estimator.country' | t }}</label>
+                        <div class="select-wrapper">
+                          <select class="select" is="country-selector" name="shipping-estimator[country]" id="shipping-estimator[country]" aria-owns="shipping-estimator-province-wrapper" {% if customer and customer.default_address %}data-default="{{ customer.default_address.country }}"{% else %}data-default="{{ section.settings.shipping_estimator_default_country }}"{% endif %}>{{ country_option_tags }}</select>
+                          {%- render 'icon' with 'chevron' -%}
+                        </div>
+                      </div>
+
+                      <div id="shipping-estimator-province-wrapper" class="input" hidden>
+                        <label class="input__block-label" for="shipping-estimator[province]">{{ 'cart.shipping_estimator.province' | t }}</label>
+                        <div class="select-wrapper">
+                          <select class="select" name="shipping-estimator[province]" id="shipping-estimator[province]" {% if customer and customer.default_address %}data-default="{{ customer.default_address.province }}"{% endif %}></select>
+                          {%- render 'icon' with 'chevron' -%}
+                        </div>
+                      </div>
+
+                      <div class="input">
+                        <label class="input__block-label" for="shipping-estimator[zip]">{{ 'cart.shipping_estimator.zip_code' | t }}</label>
+                        <input type="text" class="input__field" name="shipping-estimator[zip]" id="shipping-estimator[zip]">
+                      </div>
+                    </div>
+
+                    <button type="button" is="loader-button" class="form__submit form__submit--closer button button--primary">{{ 'cart.shipping_estimator.submit' | t }}</button>
+                  </shipping-estimator>
+                </collapsible-content>
+              </div>
+            {%- endif -%}
+          </div>
+
+          <div class="cart__aside">
+            <safe-sticky offset="24" class="cart__aside-inner">
+              <form action="{{ routes.cart_url }}" method="post" novalidate class="cart__recap">
+                {%- unless is_limited_customer -%}
+                <input type="hidden" name="checkout">
+                {%- endunless -%}
+
+                {%- for block in section.blocks -%}
+                  {%- case block.type -%}
+                    {%- when 'totals' -%}
+                      <div class="cart__recap-block" {{ block.shopify_attributes }}>
+                        <div class="cart__total-container">
+                          <span class="heading h6">{{ 'cart.general.total' | t }}</span>
+                          <span class="heading h6">{{ cart.total_price | money_with_currency }}</span>
+                        </div>
+
+                        {%- if cart.cart_level_discount_applications != blank -%}
+                          <ul class="cart__discount-list list--unstyled" role="list">
+                            {%- for discount_application in cart.cart_level_discount_applications -%}
+                              <li class="cart__discount">
+                                <span class="cart__discount-badge discount-badge">{%- render 'icon' with 'discount-badge' -%}{{ discount_application.title }}</span>
+                                <span class="cart__discount-price">-{{ discount_application.total_allocated_amount | money }}</span>
+                              </li>
+                            {%- endfor -%}
+                          </ul>
+                        {%- endif -%}
+
+                        {%- capture shipping_tax_note -%}{{ 'cart.general.shipping_tax_note_html' | t: link: shop.shipping_policy.url }}{%- endcapture -%}
+
+                        {%- if shipping_tax_note != '' -%}
+                          <p class="cart__tax-note text--subdued">{{ shipping_tax_note }}</p>
+                        {%- endif -%}
+                      </div>
+
+                    {%- when 'order_note' -%}
+                      <div class="cart__recap-note" {{ block.shopify_attributes }}>
+                        <button type="button" is="toggle-button" id="order-note-toggle" class="link text--subdued" aria-controls="cart-note" aria-expanded="{% if block.settings.open_by_default %}true{% else %}false{% endif %}">
+                          {%- if cart.note == '' -%}
+                            {{- 'cart.general.add_order_note' | t -}}
+                          {%- else -%}
+                            {{- 'cart.general.edit_order_note' | t -}}
+                          {%- endif -%}
+                        </button>
+
+                        <collapsible-content id="cart-note" class="collapsible" {% if block.settings.open_by_default %}open{% endif %}>
+                          <div class="cart__order-note">
+                            <textarea is="cart-note" aria-owns="order-note-toggle" name="note" class="input__field input__field--textarea" rows="3" placeholder="{{ 'cart.general.order_note_placeholder' | t }}" aria-label="{{ 'cart.general.order_note' | t | escape }}">{{ cart.note }}</textarea>
+                          </div>
+                        </collapsible-content>
+                      </div>
+
+                    {%- when 'express_checkout_buttons' -%}
+                      {%- comment -%}Hide express checkout for limited, Akima, and Manager+Extended customers - they can only use Pay Later{%- endcomment -%}
+                      {%- unless is_limited_customer or has_akima_tag or is_manager_extended -%}
+                        {%- if additional_checkout_buttons -%}
+                          <div class="cart__recap-block" {{ block.shopify_attributes }}>
+                            <div class="additional-checkout-buttons additional-checkout-buttons--vertical">
+                              {{- content_for_additional_checkout_buttons -}}
+                            </div>
+                          </div>
+                        {%- endif -%}
+                      {%- endunless -%}
+
+                    {%- when '@app' -%}
+                      <div class="cart__recap-block">
+                        {%- render block -%}
+                      </div>
+                  {%- endcase -%}
+                {%- endfor -%}
+
+                {%- unless is_limited_customer or has_akima_tag or is_manager_extended -%}
+                <button type="submit" class="cart__checkout-button checkout-button button button--primary button--full" name="checkout">
+                  <span class="checkout-button__lock">{%- render 'icon' with 'lock' -%}</span>
+                  Pay Now
+                </button>
+                {%- endunless -%}
+
+                {%- comment -%}Pay Later Button - Shows as "Place Order" for Limit customers, primary for Manager+Extended{%- endcomment -%}
+                <button type="button" id="pay-later-btn" class="cart__pay-later-button button button--full{% if is_limited_customer or has_akima_tag or is_manager_extended %} cart__pay-later-button--primary{% endif %}">
+                  {% if is_limited_customer %}Place Order{% elsif has_akima_tag or is_manager_extended %}Pay Later{% else %}Pay Later{% endif %}
+                </button>
+
+                <style>
+                  .cart__pay-later-button {
+                    margin-top: 1rem;
+                    background-color: #ac262c;
+                    color: white;
+                    border: none;
+                  }
+
+                  .cart__pay-later-button:hover {
+                    background-color: #8b1f24;
+                  }
+
+                  /* When Pay Later is the only button (for limited customers) */
+                  .cart__pay-later-button--primary {
+                    margin-top: 0;
+                  }
+                </style>
+              </form>
+
+              {%- comment -%}Hide "We accept" payment methods for limited, Akima, and Manager+Extended customers{%- endcomment -%}
+              {%- unless is_limited_customer or has_akima_tag or is_manager_extended -%}
+                {%- if section.settings.show_payment_methods and shop.enabled_payment_types.size > 0 -%}
+                  <div class="cart__payment-methods">
+                    <span class="cart__payment-methods-label text--xsmall text--subdued">{{ 'cart.general.we_accept' | t }}</span>
+
+                    <div class="payment-methods-list payment-methods-list--center">
+                      {% for type in shop.enabled_payment_types %}
+                        {{ type | payment_type_svg_tag }}
+                      {% endfor %}
+                    </div>
+                  </div>
+                {%- endif -%}
+              {%- endunless -%}
+            </safe-sticky>
+          </div>
+        </div>
+      </div>
+    {%- endif -%}
+  </div>
+</section>
+
+{%- comment -%}Pay Later Modal{%- endcomment -%}
+<div id="pay-later-modal">
+  <div class="pay-later-modal-content">
+    <button id="pay-later-close">&times;</button>
+    <h2>{% if is_limited_customer %}Place Order{% elsif is_manager_extended %}Pay Later Request{% else %}Pay Later Request{% endif %}</h2>
+    <form id="pay-later-form">
+      {%- unless is_limited_customer or is_manager_extended -%}
+      {%- comment -%}Delivery Method Chooser - only for non-limited and non-Manager+Extended customers{%- endcomment -%}
+      <div class="delivery-method-chooser">
+        <h3>Delivery Method</h3>
+        <div class="delivery-method-options">
+          <label class="delivery-method-option selected" id="delivery-method-ship">
+            <input type="radio" name="delivery_method" value="ship" checked>
+            <div class="delivery-method-content">
+              <span class="delivery-method-icon">&#128666;</span>
+              <div>
+                <div class="delivery-method-label">Ship to Address</div>
+                <div class="delivery-method-desc">Enter shipping address & calculate rates</div>
+              </div>
+            </div>
+          </label>
+          <label class="delivery-method-option" id="delivery-method-pickup">
+            <input type="radio" name="delivery_method" value="pickup">
+            <div class="delivery-method-content">
+              <span class="delivery-method-icon">&#127978;</span>
+              <div>
+                <div class="delivery-method-label">Local Pickup <span class="delivery-method-free">Free</span></div>
+                <div class="delivery-method-desc">400 Overpeck Avenue, Englewood NJ</div>
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+      <hr class="pay-later-divider">
+      {%- endunless -%}
+
+      <div class="pay-later-form-grid">
+        {%- comment -%}Shipping Address Section - hidden when Local Pickup is selected{%- endcomment -%}
+        <div class="pay-later-section" id="shipping-address-section">
+          <h3>Shipping Address</h3>
+          <div class="pay-later-fields-grid">
+            <div class="pay-later-field">
+              <label for="pay-later-first-name">First Name</label>
+              <input type="text" id="pay-later-first-name" name="first_name" required>
+            </div>
+            <div class="pay-later-field">
+              <label for="pay-later-last-name">Last Name</label>
+              <input type="text" id="pay-later-last-name" name="last_name" required>
+            </div>
+            {%- if is_limited_customer or is_manager_extended -%}
+            <div class="pay-later-field pay-later-field-full" id="pay-later-shipping-company-wrapper" style="display: none;">
+              <label for="pay-later-company">Company Name</label>
+              <input type="text" id="pay-later-company" name="company" readonly class="pay-later-input--readonly">
+            </div>
+            {%- else -%}
+            <div class="pay-later-field pay-later-field-full">
+              <label for="pay-later-company">Company Name</label>
+              <input type="text" id="pay-later-company" name="company">
+            </div>
+            {%- endif -%}
+            <div class="pay-later-field pay-later-field-full">
+              <label for="pay-later-address">Address</label>
+              <input type="text" id="pay-later-address" name="address" required>
+            </div>
+            <div class="pay-later-field pay-later-field-full">
+              <label for="pay-later-address2">Address 2</label>
+              <input type="text" id="pay-later-address2" name="address2">
+            </div>
+            <div class="pay-later-field">
+              <label for="pay-later-city">City</label>
+              <input type="text" id="pay-later-city" name="city" required>
+            </div>
+            <div class="pay-later-field">
+              <label for="pay-later-province">State/Province</label>
+              <input type="text" id="pay-later-province" name="province" required>
+            </div>
+            <div class="pay-later-field">
+              <label for="pay-later-zip">Zip/Postal Code</label>
+              <input type="text" id="pay-later-zip" name="zip" required>
+            </div>
+            <div class="pay-later-field">
+              <label for="pay-later-country">Country</label>
+              <select id="pay-later-country" name="country" required>
+                <option value="">Select Country</option>
+                <option value="United States">United States</option>
+                <option value="Canada">Canada</option>
+              </select>
+            </div>
+            <div class="pay-later-field">
+              <label for="pay-later-email">Email</label>
+              <input type="email" id="pay-later-email" name="email" required {% if is_limited_customer or is_manager_extended %}readonly class="pay-later-input--readonly"{% endif %}>
+            </div>
+            <div class="pay-later-field">
+              <label for="pay-later-phone">Phone</label>
+              <input type="tel" id="pay-later-phone" name="phone">
+            </div>
+          </div>
+        </div>
+
+        {%- comment -%}Billing Address Section{%- endcomment -%}
+        {%- assign billing_readonly = false -%}
+        {%- if is_limited_customer or is_manager_extended -%}
+          {%- assign billing_readonly = true -%}
+        {%- endif -%}
+        <div class="pay-later-section{% if billing_readonly %} pay-later-section--readonly{% endif %}">
+          {%- if billing_readonly -%}
+            <h3>Billing Address</h3>
+          {%- else -%}
+          <div class="pay-later-section-header">
+            <h3>Billing Address</h3>
+            <div class="pay-later-same-as-shipping">
+              <label>
+                <input type="checkbox" id="pay-later-same-as-shipping"> Same as shipping address
+              </label>
+            </div>
+          </div>
+          {%- endif -%}
+          <div class="pay-later-fields-grid" id="pay-later-billing-fields">
+            <div class="pay-later-field">
+              <label for="pay-later-billing-first-name">First Name</label>
+              <input type="text" id="pay-later-billing-first-name" name="billing_first_name" required {% if billing_readonly %}readonly class="pay-later-input--readonly"{% endif %}>
+            </div>
+            <div class="pay-later-field">
+              <label for="pay-later-billing-last-name">Last Name</label>
+              <input type="text" id="pay-later-billing-last-name" name="billing_last_name" required {% if billing_readonly %}readonly class="pay-later-input--readonly"{% endif %}>
+            </div>
+            {%- if billing_readonly -%}
+            <div class="pay-later-field pay-later-field-full" id="pay-later-billing-company-wrapper" style="display: none;">
+              <label for="pay-later-billing-company">Company Name</label>
+              <input type="text" id="pay-later-billing-company" name="billing_company" readonly class="pay-later-input--readonly">
+            </div>
+            {%- else -%}
+            <div class="pay-later-field pay-later-field-full">
+              <label for="pay-later-billing-company">Company Name</label>
+              <input type="text" id="pay-later-billing-company" name="billing_company">
+            </div>
+            {%- endif -%}
+            <div class="pay-later-field pay-later-field-full">
+              <label for="pay-later-billing-address">Address</label>
+              <input type="text" id="pay-later-billing-address" name="billing_address" required {% if billing_readonly %}readonly class="pay-later-input--readonly"{% endif %}>
+            </div>
+            <div class="pay-later-field pay-later-field-full">
+              <label for="pay-later-billing-address2">Address 2</label>
+              <input type="text" id="pay-later-billing-address2" name="billing_address2" {% if billing_readonly %}readonly class="pay-later-input--readonly"{% endif %}>
+            </div>
+            <div class="pay-later-field">
+              <label for="pay-later-billing-city">City</label>
+              <input type="text" id="pay-later-billing-city" name="billing_city" required {% if billing_readonly %}readonly class="pay-later-input--readonly"{% endif %}>
+            </div>
+            <div class="pay-later-field">
+              <label for="pay-later-billing-province">State/Province</label>
+              <input type="text" id="pay-later-billing-province" name="billing_province" required {% if billing_readonly %}readonly class="pay-later-input--readonly"{% endif %}>
+            </div>
+            <div class="pay-later-field">
+              <label for="pay-later-billing-zip">Zip/Postal Code</label>
+              <input type="text" id="pay-later-billing-zip" name="billing_zip" required {% if billing_readonly %}readonly class="pay-later-input--readonly"{% endif %}>
+            </div>
+            <div class="pay-later-field">
+              <label for="pay-later-billing-country">Country</label>
+              {%- if billing_readonly -%}
+                <input type="hidden" id="pay-later-billing-country-hidden" name="billing_country" value="">
+              {%- endif -%}
+              <select id="pay-later-billing-country" {% unless billing_readonly %}name="billing_country"{% endunless %} required {% if billing_readonly %}disabled class="pay-later-input--readonly"{% endif %}>
+                <option value="">Select Country</option>
+                <option value="US">United States</option>
+                <option value="CA">Canada</option>
+              </select>
+            </div>
+            <div class="pay-later-field" id="pay-later-billing-email-wrapper" style="display: none;">
+              <label for="pay-later-billing-email">Email</label>
+              <input type="email" id="pay-later-billing-email" name="billing_email">
+            </div>
+            <div class="pay-later-field" id="pay-later-billing-phone-spacer"></div>
+            <div class="pay-later-field">
+              <label for="pay-later-billing-phone">Phone</label>
+              <input type="tel" id="pay-later-billing-phone" name="billing_phone" {% if billing_readonly %}readonly class="pay-later-input--readonly"{% endif %}>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="pay-later-divider">
+
+      {%- comment -%}Shipping Method Section - hidden when Local Pickup is selected{%- endcomment -%}
+      <div class="pay-later-section pay-later-section-full" id="shipping-method-section">
+        <h3>Shipping Method</h3>
+        <button type="button" id="pay-later-calculate-shipping" class="button-calculate-shipping">
+          Calculate Shipping Rates
+        </button>
+        <div id="pay-later-shipping-rates" class="shipping-rates-container" style="display: none;">
+          <div class="shipping-rates-header">Available Shipping Methods</div>
+          <div id="pay-later-shipping-options" class="shipping-options-list"></div>
+        </div>
+        <div id="pay-later-shipping-message" class="shipping-message"></div>
+      </div>
+
+      {%- comment -%}Local Pickup confirmation - shown only when Local Pickup is selected{%- endcomment -%}
+      {%- unless is_limited_customer or is_manager_extended -%}
+      <div class="pay-later-section pay-later-section-full" id="local-pickup-confirmation" style="display: none;">
+        <div class="local-pickup-details">
+          <div class="local-pickup-details-icon">&#127978;</div>
+          <div>
+            <div class="local-pickup-details-title">Local Pickup</div>
+            <div class="local-pickup-details-address">400 Overpeck Avenue, Englewood NJ</div>
+            <div class="local-pickup-details-note">Usually ready in 24 hours</div>
+          </div>
+          <div class="local-pickup-details-price">Free</div>
+        </div>
+      </div>
+      {%- endunless -%}
+
+      <hr class="pay-later-divider">
+
+      <div class="pay-later-submit-section">
+        <button type="submit" class="button button--primary button--full">{% if is_limited_customer %}Submit Order{% else %}Submit Pay Later Request{% endif %}</button>
+        <div id="pay-later-message"></div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+/* Delivery Method Chooser Styles */
+.delivery-method-chooser {
+  margin-bottom: 0;
+}
+.delivery-method-chooser h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #282828;
+  margin: 0 0 0.75rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.delivery-method-options {
+  display: flex;
+  gap: 0.75rem;
+}
+.delivery-method-option {
+  flex: 1;
+  display: flex;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.delivery-method-option:hover {
+  border-color: #192674;
+  background: #f8f9ff;
+}
+.delivery-method-option.selected {
+  border-color: #192674;
+  background: #f0f2ff;
+}
+.delivery-method-option input[type="radio"] {
+  display: none;
+}
+.delivery-method-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+.delivery-method-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+.delivery-method-label {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: #282828;
+}
+.delivery-method-free {
+  display: inline-block;
+  background: #d4edda;
+  color: #155724;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.1em 0.5em;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+  margin-left: 0.35em;
+}
+.delivery-method-desc {
+  font-size: 0.8125rem;
+  color: #666;
+  margin-top: 2px;
+}
+@media (max-width: 500px) {
+  .delivery-method-options {
+    flex-direction: column;
+  }
+}
+
+/* Local Pickup Confirmation Styles */
+.local-pickup-details {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: #f0f8f0;
+  border: 2px solid #c3e6cb;
+  border-radius: 6px;
+}
+.local-pickup-details-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+.local-pickup-details-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #282828;
+}
+.local-pickup-details-address {
+  font-size: 0.875rem;
+  color: #555;
+  margin-top: 2px;
+}
+.local-pickup-details-note {
+  font-size: 0.8125rem;
+  color: #666;
+  margin-top: 2px;
+}
+.local-pickup-details-price {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: #155724;
+  white-space: nowrap;
+}
+
+/* Pay Later Modal Styles */
+#pay-later-modal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.5);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+#pay-later-modal.active {
+  display: flex;
+}
+.pay-later-modal-content {
+  background: #fff;
+  padding: 2rem;
+  max-width: 1000px;
+  width: 100%;
+  margin: auto;
+  border-radius: 0;
+  position: relative;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  animation: fadeInScale 0.25s;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+@keyframes fadeInScale {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+#pay-later-modal h2 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-align: left;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #282828;
+  border-bottom: 2px solid #f5f5f5;
+  padding-bottom: 0.75rem;
+}
+#pay-later-modal h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+  text-transform: uppercase;
+  color: #282828;
+  letter-spacing: 0.05em;
+}
+#pay-later-close {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #282828;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  line-height: 1;
+  padding: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#pay-later-close:hover {
+  opacity: 0.6;
+}
+#pay-later-form {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+.pay-later-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+@media (min-width: 768px) {
+  .pay-later-form-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+}
+.pay-later-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.pay-later-section-full {
+  grid-column: 1 / -1;
+}
+.pay-later-fields-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+@media (min-width: 768px) {
+  .pay-later-fields-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+}
+.pay-later-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.pay-later-field-full {
+  grid-column: 1 / -1;
+}
+.pay-later-field label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #282828;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.pay-later-field input[type="text"],
+.pay-later-field input[type="email"],
+.pay-later-field input[type="tel"],
+.pay-later-field select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 0;
+  font-size: 0.9375rem;
+  background: #fff;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+.pay-later-field input:focus,
+.pay-later-field select:focus {
+  border-color: #192674;
+  outline: none;
+  box-shadow: 0 0 0 1px #192674;
+}
+.pay-later-input--readonly {
+  background-color: #f5f5f5 !important;
+  color: #666 !important;
+  cursor: not-allowed !important;
+  border-color: #ddd !important;
+}
+.pay-later-input--readonly:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: #ddd !important;
+}
+.pay-later-section--readonly {
+  position: relative;
+}
+.pay-later-readonly-badge {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: none;
+  letter-spacing: normal;
+  display: block;
+  margin-top: 0.25rem;
+}
+.button-calculate-shipping {
+  background: #192674;
+  color: #fff;
+  border: none;
+  border-radius: 0;
+  padding: 1rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+}
+.button-calculate-shipping:hover {
+  background: #0f1150;
+}
+.button-calculate-shipping:disabled {
+  background: #e9ecef;
+  color: #6c757d;
+  cursor: not-allowed;
+}
+.shipping-rates-container {
+  margin-top: 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 0;
+}
+.shipping-rates-header {
+  background: #f5f5f5;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: #282828;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.shipping-options-list {
+  display: flex;
+  flex-direction: column;
+}
+.shipping-option {
+  padding: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.shipping-option:last-child {
+  border-bottom: none;
+}
+.shipping-option:hover {
+  background: #fafafa;
+}
+.shipping-option.selected {
+  background: #f0f4ff;
+  border-left: 3px solid #192674;
+}
+.shipping-option input[type="radio"] {
+  margin: 0;
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: #192674;
+}
+.shipping-option-name {
+  font-weight: 500;
+  color: #282828;
+  font-size: 0.9375rem;
+}
+.shipping-option-price {
+  font-weight: 700;
+  color: #192674;
+  font-size: 1rem;
+}
+.shipping-option-delivery {
+  font-size: 0.8125rem;
+  color: #666;
+}
+.local-pickup-address {
+  font-size: 0.8125rem;
+  color: #666;
+  margin-top: 2px;
+}
+.shipping-message {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0;
+  font-size: 0.875rem;
+}
+.shipping-message.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+.shipping-message.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+.pay-later-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pay-later-same-as-shipping {
+  margin-bottom: 0;
+}
+.pay-later-same-as-shipping label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+}
+.pay-later-same-as-shipping input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+.pay-later-divider {
+  border: none;
+  border-top: 2px solid #f5f5f5;
+  margin: 0;
+}
+.pay-later-submit-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-top: 1rem;
+}
+#pay-later-message {
+  text-align: center;
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+@media (max-width: 767px) {
+  .pay-later-modal-content {
+    padding: 1.5rem 1rem;
+    max-height: 95vh;
+  }
+  #pay-later-modal h2 {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  #pay-later-close {
+    top: 1rem;
+    right: 1rem;
+    font-size: 1.5rem;
+  }
+}
+
+/* Limited Customer Quantity Selector Styles */
+.quantity-selector--limited {
+  justify-content: center;
+}
+
+.quantity-selector--limited .quantity-selector__input {
+  background-color: #f5f5f5;
+  color: #666;
+  cursor: not-allowed;
+  text-align: center;
+}
+
+.quantity-selector--limited .quantity-selector__input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.product-form__quantity--limited .product-form__quantity-rules {
+  color: #666;
+  font-style: italic;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var payLaterBtn = document.getElementById('pay-later-btn');
+  var payLaterModal = document.getElementById('pay-later-modal');
+  var payLaterClose = document.getElementById('pay-later-close');
+  var payLaterForm = document.getElementById('pay-later-form');
+  var payLaterMessage = document.getElementById('pay-later-message');
+
+  var calculateShippingBtn = document.getElementById('pay-later-calculate-shipping');
+  var shippingRatesContainer = document.getElementById('pay-later-shipping-rates');
+  var shippingOptionsContainer = document.getElementById('pay-later-shipping-options');
+  var shippingMessage = document.getElementById('pay-later-shipping-message');
+  var selectedShippingMethod = null;
+
+  // Limited customer flag from Liquid
+  var isLimitedCustomer = {{ is_limited_customer | json }};
+  var isBulkOrderCustomer = {{ is_bulk_order_customer | json }};
+  var isAkimaCompanyCustomer = {{ is_akima_company_customer | json }};
+  var isManagerExtended = {{ is_manager_extended | json }};
+
+  // Global settings loaded from API (applies to all Limit users and Manager+Extended users)
+  var globalSettings = null;
+
+  // Customer company slug for per-company billing
+  var customerCompany = {{ customer_company_slug | json }};
+
+  // Delivery method toggle (Ship to Address vs Local Pickup) - only for non-limited customers
+  var deliveryMethodShip = document.getElementById('delivery-method-ship');
+  var deliveryMethodPickup = document.getElementById('delivery-method-pickup');
+  var shippingAddressSection = document.getElementById('shipping-address-section');
+  var shippingMethodSection = document.getElementById('shipping-method-section');
+  var localPickupConfirmation = document.getElementById('local-pickup-confirmation');
+
+  function setDeliveryMethod(method) {
+    var sameAsShippingWrapper = document.querySelector('.pay-later-same-as-shipping');
+    var billingEmailWrapper = document.getElementById('pay-later-billing-email-wrapper');
+    var billingPhoneSpacer = document.getElementById('pay-later-billing-phone-spacer');
+
+    if (method === 'pickup') {
+      // Hide shipping address and shipping method sections
+      if (shippingAddressSection) shippingAddressSection.style.display = 'none';
+      if (shippingMethodSection) shippingMethodSection.style.display = 'none';
+      if (localPickupConfirmation) localPickupConfirmation.style.display = 'block';
+
+      // Hide "Same as shipping" checkbox, show billing email, hide spacer
+      if (sameAsShippingWrapper) sameAsShippingWrapper.style.display = 'none';
+      if (billingEmailWrapper) billingEmailWrapper.style.display = '';
+      if (billingPhoneSpacer) billingPhoneSpacer.style.display = 'none';
+
+      // Uncheck "same as shipping" if it was checked
+      if (sameAsShippingCheckbox) {
+        sameAsShippingCheckbox.checked = false;
+        sameAsShippingCheckbox.dispatchEvent(new Event('change'));
+      }
+
+      // Remove required from hidden shipping address fields
+      var shippingFields = shippingAddressSection ? shippingAddressSection.querySelectorAll('[required]') : [];
+      shippingFields.forEach(function(f) { f.setAttribute('data-was-required', 'true'); f.removeAttribute('required'); });
+
+      // Auto-set local pickup as the shipping method
+      selectedShippingMethod = {
+        name: 'Local Pickup - 400 Overpeck Avenue, Englewood NJ',
+        price: 0,
+        formatted_price: 'Free',
+        code: 'LOCAL_PICKUP',
+        source: 'local_pickup'
+      };
+
+      // Update toggle styling
+      if (deliveryMethodShip) deliveryMethodShip.classList.remove('selected');
+      if (deliveryMethodPickup) deliveryMethodPickup.classList.add('selected');
+    } else {
+      // Show shipping address and shipping method sections
+      if (shippingAddressSection) shippingAddressSection.style.display = '';
+      if (shippingMethodSection) shippingMethodSection.style.display = '';
+      if (localPickupConfirmation) localPickupConfirmation.style.display = 'none';
+
+      // Show "Same as shipping" checkbox, hide billing email, show spacer
+      if (sameAsShippingWrapper) sameAsShippingWrapper.style.display = '';
+      if (billingEmailWrapper) billingEmailWrapper.style.display = 'none';
+      if (billingPhoneSpacer) billingPhoneSpacer.style.display = '';
+
+      // Restore required on shipping address fields
+      var shippingFields = shippingAddressSection ? shippingAddressSection.querySelectorAll('[data-was-required]') : [];
+      shippingFields.forEach(function(f) { f.setAttribute('required', ''); f.removeAttribute('data-was-required'); });
+
+      // Clear auto-set shipping method so user must calculate & choose
+      selectedShippingMethod = null;
+
+      // Update toggle styling
+      if (deliveryMethodShip) deliveryMethodShip.classList.add('selected');
+      if (deliveryMethodPickup) deliveryMethodPickup.classList.remove('selected');
+    }
+  }
+
+  if (deliveryMethodShip) {
+    deliveryMethodShip.addEventListener('click', function() { setDeliveryMethod('ship'); });
+  }
+  if (deliveryMethodPickup) {
+    deliveryMethodPickup.addEventListener('click', function() { setDeliveryMethod('pickup'); });
+  }
+
+  // Function to load global settings for limited and Manager+Extended customers
+  async function loadGlobalSettings() {
+    if (!isLimitedCustomer && !isManagerExtended) return;
+
+    try {
+      var url = 'https://image-first-portal.netlify.app/.netlify/functions/get-global-settings';
+      if (customerCompany) url += '?company=' + encodeURIComponent(customerCompany);
+      var response = await fetch(url);
+      var data = await response.json();
+
+      if (data.settings) {
+        globalSettings = data.settings;
+        // Pre-populate PO Number field
+        var poField = document.getElementById('cart-po-number');
+        if (poField && globalSettings.globalPO) {
+          poField.value = globalSettings.globalPO;
+          // Update cart attribute
+          if (typeof window.updateCartAttribute === 'function') {
+            window.updateCartAttribute('attributes[PO Number]', globalSettings.globalPO);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading global settings:', error);
+    }
+  }
+
+  // Function to auto-populate billing address for limited and Manager+Extended customers
+  function populateLimitedCustomerBillingAddress() {
+    if ((!isLimitedCustomer && !isManagerExtended) || !globalSettings) return;
+
+    var fields = {
+      'pay-later-billing-first-name': globalSettings.billingFirstName,
+      'pay-later-billing-last-name': globalSettings.billingLastName,
+      'pay-later-billing-company': globalSettings.billingCompanyName,
+      'pay-later-billing-address': globalSettings.billingAddress,
+      'pay-later-billing-address2': globalSettings.billingAddress2,
+      'pay-later-billing-city': globalSettings.billingCity,
+      'pay-later-billing-province': globalSettings.billingState,
+      'pay-later-billing-zip': globalSettings.billingZip,
+      'pay-later-billing-country': globalSettings.billingCountry,
+      'pay-later-billing-phone': globalSettings.billingPhone
+    };
+
+    for (var fieldId in fields) {
+      var element = document.getElementById(fieldId);
+      if (element && fields[fieldId]) {
+        element.value = fields[fieldId];
+      }
+    }
+
+    // Show Company Name field if it has a value (billing)
+    var companyWrapper = document.getElementById('pay-later-billing-company-wrapper');
+    if (companyWrapper && globalSettings.billingCompanyName) {
+      companyWrapper.style.display = 'block';
+    }
+
+    // Auto-populate shipping company name for Limit customers
+    var shippingCompanyField = document.getElementById('pay-later-company');
+    var shippingCompanyWrapper = document.getElementById('pay-later-shipping-company-wrapper');
+    if (shippingCompanyField && globalSettings.billingCompanyName) {
+      shippingCompanyField.value = globalSettings.billingCompanyName;
+      if (shippingCompanyWrapper) shippingCompanyWrapper.style.display = 'block';
+    }
+
+    // Also update the hidden country input for form submission (since select is disabled)
+    var hiddenCountry = document.getElementById('pay-later-billing-country-hidden');
+    if (hiddenCountry && globalSettings.billingCountry) {
+      hiddenCountry.value = globalSettings.billingCountry;
+    }
+  }
+
+  // Load global settings on page load for limited and Manager+Extended customers
+  if (isLimitedCustomer || isManagerExtended) {
+    loadGlobalSettings();
+  }
+
+  if (payLaterBtn) {
+    payLaterBtn.addEventListener('click', function() {
+      payLaterModal.classList.add('active');
+      loadCartData();
+      // Auto-populate shipping email for limited and Manager+Extended customers
+      if (isLimitedCustomer || isManagerExtended) {
+        var shippingEmailField = document.getElementById('pay-later-email');
+        if (shippingEmailField) {
+          shippingEmailField.value = {{ customer.email | json }};
+        }
+      }
+      // Auto-populate billing address for limited and Manager+Extended customers
+      populateLimitedCustomerBillingAddress();
+    });
+  }
+
+  if (payLaterClose) {
+    payLaterClose.addEventListener('click', function() {
+      payLaterModal.classList.remove('active');
+      payLaterMessage.textContent = '';
+    });
+  }
+
+  if (payLaterModal) {
+    payLaterModal.addEventListener('click', function(e) {
+      if (e.target === payLaterModal) {
+        payLaterModal.classList.remove('active');
+        payLaterMessage.textContent = '';
+      }
+    });
+  }
+
+  // "Same as shipping address" checkbox logic
+  var sameAsShippingCheckbox = document.getElementById('pay-later-same-as-shipping');
+  var billingFieldsContainer = document.getElementById('pay-later-billing-fields');
+  if (sameAsShippingCheckbox) {
+    var shippingToBillingMap = {
+      'pay-later-first-name': 'pay-later-billing-first-name',
+      'pay-later-last-name': 'pay-later-billing-last-name',
+      'pay-later-company': 'pay-later-billing-company',
+      'pay-later-address': 'pay-later-billing-address',
+      'pay-later-address2': 'pay-later-billing-address2',
+      'pay-later-city': 'pay-later-billing-city',
+      'pay-later-province': 'pay-later-billing-province',
+      'pay-later-zip': 'pay-later-billing-zip',
+      'pay-later-country': 'pay-later-billing-country',
+      'pay-later-phone': 'pay-later-billing-phone'
+    };
+
+    function copyShippingToBilling() {
+      for (var shipId in shippingToBillingMap) {
+        var shipEl = document.getElementById(shipId);
+        var billEl = document.getElementById(shippingToBillingMap[shipId]);
+        if (shipEl && billEl) {
+          billEl.value = shipEl.value;
+        }
+      }
+    }
+
+    sameAsShippingCheckbox.addEventListener('change', function() {
+      if (this.checked) {
+        copyShippingToBilling();
+        if (billingFieldsContainer) billingFieldsContainer.style.display = 'none';
+      } else {
+        if (billingFieldsContainer) billingFieldsContainer.style.display = '';
+      }
+    });
+  }
+
+  if (payLaterForm) {
+    payLaterForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      if (!selectedShippingMethod) {
+        showShippingMessage('Please select a shipping method before submitting.', 'error');
+        return;
+      }
+
+      // If "same as shipping" is checked, copy values before building form data
+      if (sameAsShippingCheckbox && sameAsShippingCheckbox.checked) {
+        copyShippingToBilling();
+      }
+
+      payLaterMessage.textContent = 'Processing...';
+
+      var formData = new FormData(payLaterForm);
+      var shipping = {};
+      var billing = {};
+      formData.forEach(function(value, key) {
+        if (key.startsWith('billing_')) {
+          billing[key.replace('billing_', '')] = value;
+        } else {
+          shipping[key] = value;
+        }
+      });
+
+      // For Local Pickup: shipping address fields are hidden/empty.
+      // Use billing data so the draft order gets proper email, name, etc.
+      var isLocalPickup = selectedShippingMethod && selectedShippingMethod.code === 'LOCAL_PICKUP';
+      if (isLocalPickup) {
+        shipping.email = billing.email || shipping.email;
+        shipping.phone = billing.phone || shipping.phone;
+        shipping.first_name = billing.first_name || shipping.first_name;
+        shipping.last_name = billing.last_name || shipping.last_name;
+        shipping.company = billing.company || shipping.company;
+        // Use the pickup location as the shipping address
+        shipping.address = '400 Overpeck Avenue';
+        shipping.address2 = '';
+        shipping.city = 'Englewood';
+        shipping.province = 'NJ';
+        shipping.zip = '07631';
+        shipping.country = 'United States';
+      }
+
+      if (selectedShippingMethod) {
+        shipping.selected_shipping_method = selectedShippingMethod;
+      }
+
+      fetch('/cart.js')
+        .then(function(res) { return res.json(); })
+        .then(function(cart) {
+          var cartItemsWithProperties = [];
+          if (cart.items && cart.items.length > 0) {
+            cartItemsWithProperties = cart.items.map(function(item) {
+              return {
+                id: item.id,
+                variant_id: item.variant_id,
+                product_id: item.product_id,
+                quantity: item.quantity,
+                title: item.title,
+                price: item.price,
+                final_price: item.final_price,
+                final_line_price: item.final_line_price,
+                properties: item.properties || {}
+              };
+            });
+          }
+
+          // Extract special instructions before clearing cart.note
+          var specialInstructions = cart.note || '';
+
+          // Clear cart.note to prevent duplicate in Shopify's default Notes field
+          // Special instructions are sent separately in special_instructions field
+          delete cart.note;
+
+          // Get PO number from input field first (more reliable), fallback to cart attributes
+          var isAkimaCustomer = {{ has_akima_tag | json }};
+          var poNumber = '';
+          var projectNumber = '';
+          var glAccount = '';
+
+          if (isAkimaCustomer) {
+            var projectField = document.getElementById('cart-project-number');
+            var glField = document.getElementById('cart-gl-account');
+            projectNumber = projectField ? projectField.value : '';
+            glAccount = glField ? glField.value : '';
+          } else {
+            var poNumberField = document.getElementById('cart-po-number');
+            poNumber = (poNumberField && poNumberField.value)
+              ? poNumberField.value
+              : (cart.attributes && cart.attributes['PO Number'] ? cart.attributes['PO Number'] : '');
+          }
+
+          var payload = {
+            cart: cart,
+            cart_items_with_properties: cartItemsWithProperties,
+            po_number: poNumber,
+            project_number: projectNumber,
+            gl_account: glAccount,
+            special_instructions: specialInstructions,
+            shipping: shipping,
+            billing: billing,
+            selected_shipping_method: selectedShippingMethod,
+            customer_id: {{ customer.id | default: 'null' }}
+          };
+
+          return fetch('https://image-first-portal.netlify.app/.netlify/functions/create-draft-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data.success) {
+            payLaterMessage.textContent = 'Pay Later Order Created Successfully!';
+            payLaterMessage.style.color = '#155724';
+            payLaterForm.reset();
+
+            // Clear cart attributes (Special Instructions and PO Number) first
+            var clearAttributesData = new FormData();
+            clearAttributesData.append('note', '');
+            clearAttributesData.append('attributes[PO Number]', '');
+            clearAttributesData.append('attributes[Project Number]', '');
+            clearAttributesData.append('attributes[G/L Account]', '');
+
+            fetch('/cart/update.js', {
+              method: 'POST',
+              body: clearAttributesData
+            })
+              .then(function(response) {
+                if (!response.ok) {
+                  throw new Error('Failed to clear cart attributes');
+                }
+                return response.json();
+              })
+              .then(function() {
+                // Now clear the cart items
+                return fetch('/cart/clear.js', { method: 'POST' });
+              })
+              .then(function(response) {
+                if (!response.ok) {
+                  throw new Error('Failed to clear cart');
+                }
+                return response.json();
+              })
+              .then(function() {
+                // Clear the visible form fields
+                document.getElementById('cart-special-instructions').value = '';
+                var poField = document.getElementById('cart-po-number');
+                if (poField) poField.value = '';
+                var projectNumField = document.getElementById('cart-project-number');
+                var glAcctField = document.getElementById('cart-gl-account');
+                if (projectNumField) projectNumField.value = '';
+                if (glAcctField) glAcctField.value = '';
+
+                // Clear bulk order sessionStorage so names don't linger
+                sessionStorage.removeItem('bulkOrderCurrentPerson');
+                sessionStorage.removeItem('bulkOrderPersonNames');
+
+                // Wait for cart clear to complete, then redirect with page reload
+                setTimeout(function() {
+                  window.location.replace('/pages/thank-you');
+                }, 1800);
+              })
+              .catch(function(error) {
+                console.error('Cart clear error:', error);
+                // Clear bulk order sessionStorage even if cart clear fails
+                sessionStorage.removeItem('bulkOrderCurrentPerson');
+                sessionStorage.removeItem('bulkOrderPersonNames');
+                // Still redirect even if cart clear fails
+                setTimeout(function() {
+                  window.location.replace('/pages/thank-you');
+                }, 1800);
+              });
+          } else {
+            payLaterMessage.textContent = data.message || 'There was an error submitting your order.';
+            payLaterMessage.style.color = '#721c24';
+          }
+        })
+        .catch(function(err) {
+          payLaterMessage.textContent = 'There was an error submitting your order.';
+          payLaterMessage.style.color = '#721c24';
+        });
+    });
+  }
+
+  if (calculateShippingBtn) {
+    calculateShippingBtn.addEventListener('click', function() {
+      calculateShippingRates();
+    });
+  }
+
+  function loadCartData() {
+    fetch('/cart.js')
+      .then(function(response) { return response.json(); })
+      .then(function(cart) {
+        window.cart = cart;
+        console.log('Cart loaded:', cart);
+      })
+      .catch(function(error) {
+        console.error('Error loading cart:', error);
+      });
+  }
+
+  function calculateShippingRates() {
+    var shippingAddress = {
+      country: document.getElementById('pay-later-country').value || '',
+      province: document.getElementById('pay-later-province').value || '',
+      zip: document.getElementById('pay-later-zip').value || '',
+      city: document.getElementById('pay-later-city').value || '',
+      address1: document.getElementById('pay-later-address').value || ''
+    };
+
+    // Strip ZIP+4 to just 5 digits for carrier rate lookups
+    if (shippingAddress.zip && shippingAddress.zip.indexOf('-') !== -1) {
+      shippingAddress.zip = shippingAddress.zip.split('-')[0];
+    }
+
+    if (!shippingAddress.country || !shippingAddress.zip) {
+      showShippingMessage('Please fill in at least Country and Zip Code before calculating rates.', 'error');
+      return;
+    }
+
+    if (!window.cart || !window.cart.items || window.cart.items.length === 0) {
+      showShippingMessage('Please add items to your cart before calculating shipping rates.', 'error');
+      return;
+    }
+
+    calculateShippingBtn.disabled = true;
+    calculateShippingBtn.textContent = 'Calculating...';
+    showShippingMessage('', '');
+
+    // Build query string with proper shipping address format
+    var queryParams = [];
+    queryParams.push('shipping_address[zip]=' + encodeURIComponent(shippingAddress.zip));
+    queryParams.push('shipping_address[country]=' + encodeURIComponent(shippingAddress.country));
+
+    if (shippingAddress.province) {
+      queryParams.push('shipping_address[province]=' + encodeURIComponent(shippingAddress.province));
+    }
+    if (shippingAddress.city) {
+      queryParams.push('shipping_address[city]=' + encodeURIComponent(shippingAddress.city));
+    }
+    if (shippingAddress.address1) {
+      queryParams.push('shipping_address[address1]=' + encodeURIComponent(shippingAddress.address1));
+    }
+
+    var queryString = queryParams.join('&');
+
+    console.log('Requesting shipping rates with:', queryString);
+
+    fetch('/cart/shipping_rates.json?' + queryString)
+      .then(function(response) {
+        console.log('Shipping rates response status:', response.status);
+        if (!response.ok) {
+          throw new Error('HTTP error! status: ' + response.status);
+        }
+        return response.json();
+      })
+      .then(function(data) {
+        console.log('Shipping rates full response:', JSON.stringify(data, null, 2));
+        calculateShippingBtn.disabled = false;
+        calculateShippingBtn.textContent = 'Calculate Shipping Rates';
+
+        // Check different possible response structures
+        var rates = data.shipping_rates || data.rates || [];
+
+        console.log('Extracted rates:', rates);
+        console.log('Rates length:', rates.length);
+
+        if (rates && rates.length > 0) {
+          displayShippingRates(rates);
+          // Show "1 shipping option" for non-BLS/non-Akima Limit customers, actual count for others
+          var shippingMessage = (isLimitedCustomer && !isBulkOrderCustomer && !isAkimaCompanyCustomer)
+            ? 'Found 1 shipping option available.'
+            : 'Found ' + rates.length + ' shipping option(s) available.';
+          showShippingMessage(shippingMessage, 'success');
+        } else {
+          // Log the entire data object to see what we're getting
+          console.warn('No shipping rates found. Full data object:', data);
+
+          var errorMsg = 'No shipping rates available for this address.';
+          if (data.message) {
+            errorMsg = data.message;
+          } else if (data.error) {
+            errorMsg = data.error;
+          }
+          showShippingMessage(errorMsg + ' Please verify all address fields are correct.', 'error');
+          shippingRatesContainer.style.display = 'none';
+        }
+      })
+      .catch(function(error) {
+        console.error('Shipping rates error:', error);
+        calculateShippingBtn.disabled = false;
+        calculateShippingBtn.textContent = 'Calculate Shipping Rates';
+        showShippingMessage('Error calculating shipping rates. The cart may not have items requiring shipping, or the address may be invalid.', 'error');
+      });
+  }
+
+  function displayShippingRates(rates) {
+    shippingOptionsContainer.innerHTML = '';
+
+    // Filter rates for Limit customers - only show UPS Ground (except BLS bulk order and Akima company customers who see all options)
+    if (isLimitedCustomer && !isBulkOrderCustomer && !isAkimaCompanyCustomer) {
+      rates = rates.filter(function(rate) {
+        var rateName = (rate.name || rate.presentment_name || '').toLowerCase();
+        return rateName.includes('ups') && rateName.includes('ground');
+      });
+
+      // If no UPS Ground found, show message
+      if (rates.length === 0) {
+        showShippingMessage('UPS Ground shipping is required for your account. Please contact support if this option is not available.', 'error');
+        shippingRatesContainer.style.display = 'none';
+        return;
+      }
+    }
+
+    rates.forEach(function(rate, index) {
+      var optionDiv = document.createElement('div');
+      optionDiv.className = 'shipping-option';
+
+      var radioInput = document.createElement('input');
+      radioInput.type = 'radio';
+      radioInput.name = 'shipping_method';
+      radioInput.value = rate.name + ':' + rate.price;
+      radioInput.id = 'shipping_' + index;
+
+      var layoutDiv = document.createElement('div');
+      layoutDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;width:100%;';
+
+      var nameDiv = document.createElement('div');
+      nameDiv.className = 'shipping-option-name';
+      nameDiv.textContent = rate.name || rate.presentment_name;
+
+      var rightDiv = document.createElement('div');
+      rightDiv.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:0.2em;';
+
+      var priceDiv = document.createElement('div');
+      priceDiv.className = 'shipping-option-price';
+
+      // Handle price - it's already in dollars as a string from UPS
+      var priceInDollars = parseFloat(rate.price);
+      priceDiv.textContent = '$' + priceInDollars.toFixed(2);
+
+      var deliveryDiv = document.createElement('div');
+      deliveryDiv.className = 'shipping-option-delivery';
+
+      // Use delivery_date if available, otherwise use estimate
+      if (rate.delivery_date) {
+        var deliveryDate = new Date(rate.delivery_date);
+        deliveryDiv.textContent = 'Delivery: ' + deliveryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      } else if (rate.delivery_days && rate.delivery_days.length > 0) {
+        var days = rate.delivery_days[0];
+        deliveryDiv.textContent = days + ' business day' + (days > 1 ? 's' : '');
+      } else {
+        deliveryDiv.textContent = getDeliveryEstimate(rate.name);
+      }
+
+      rightDiv.appendChild(priceDiv);
+      rightDiv.appendChild(deliveryDiv);
+      layoutDiv.appendChild(nameDiv);
+      layoutDiv.appendChild(rightDiv);
+      optionDiv.appendChild(radioInput);
+      optionDiv.appendChild(layoutDiv);
+
+      optionDiv.addEventListener('click', function() {
+        selectShippingOption(this, rate);
+      });
+
+      shippingOptionsContainer.appendChild(optionDiv);
+    });
+
+    if (rates.length > 0) {
+      var firstOption = shippingOptionsContainer.querySelector('.shipping-option');
+      if (firstOption) {
+        selectShippingOption(firstOption, rates[0]);
+      }
+    }
+
+    shippingRatesContainer.style.display = 'block';
+  }
+
+  function selectShippingOption(optionElement, rate) {
+    // Deselect all shipping options
+    var allOptions = shippingOptionsContainer.querySelectorAll('.shipping-option');
+    allOptions.forEach(function(opt) {
+      opt.classList.remove('selected');
+    });
+
+    optionElement.classList.add('selected');
+
+    // Price is already in dollars as a string from UPS
+    var priceInDollars = parseFloat(rate.price);
+
+    selectedShippingMethod = {
+      name: rate.name || rate.presentment_name,
+      price: priceInDollars,
+      formatted_price: '$' + priceInDollars.toFixed(2),
+      code: rate.code,
+      source: rate.source,
+      delivery_date: rate.delivery_date,
+      carrier_service_id: rate.carrier_service_id
+    };
+
+    console.log('Selected shipping method:', selectedShippingMethod);
+
+    var radio = optionElement.querySelector('input[type="radio"]');
+    if (radio) {
+      radio.checked = true;
+    }
+  }
+
+  function showShippingMessage(message, type) {
+    shippingMessage.textContent = message;
+    shippingMessage.className = 'shipping-message ' + (type || '');
+  }
+
+  function getDeliveryEstimate(shippingName) {
+    var estimates = {
+      'Ground': '3-7 business days',
+      '2nd Day Air': '2 business days',
+      'Next Day Air': '1 business day',
+      'Next Day Air Saver': '1 business day',
+      '3 Day Select': '3 business days',
+      'Standard': '3-5 business days',
+      'Express': '1-2 business days'
+    };
+
+    for (var key in estimates) {
+      if (shippingName.includes(key)) {
+        return estimates[key];
+      }
+    }
+
+    return 'Delivery time varies';
+  }
+});
+</script>
+
+{% schema %}
+{
+  "name": "Cart",
+  "blocks": [
+    {
+      "type": "totals",
+      "name": "Totals",
+      "limit": 1
+    },
+    {
+      "type": "order_note",
+      "name": "Order note",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "checkbox",
+          "id": "open_by_default",
+          "label": "Open by default",
+          "default": false
+        }
+      ]
+    },
+    {
+      "type": "express_checkout_buttons",
+      "name": "Express checkout buttons",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "paragraph",
+          "content": "Make payment faster with accelerated payment buttons. [Learn more](https://shopify.dev/themes/pricing-payments/accelerated-checkout)"
+        }
+      ]
+    },
+    {
+      "type": "@app"
+    }
+  ],
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "show_payment_methods",
+      "label": "Show payment methods",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_shipping_estimator",
+      "label": "Show shipping rates calculator",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "shipping_estimator_default_country",
+      "label": "Default country",
+      "info": "If the customer is logged in, the country of their shipping address will be used.",
+      "default": "United States",
+      "visible_if": "{{ section.settings.show_shipping_estimator }}"
+    },
+    {
+      "type": "text",
+      "id": "empty_button_link",
+      "label": "Empty button link",
+      "default": "/pages/admin"
+    }
+  ]
+}
+{% endschema %}

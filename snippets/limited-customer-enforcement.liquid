@@ -1,0 +1,78 @@
+{%- comment -%}
+  Limited Customer Quantity Enforcement
+  Restricts customers with "Limit" tag to quantity of 1 per item
+{%- endcomment -%}
+
+{%- assign is_limited_customer = false -%}
+{%- assign is_akima_company_customer = false -%}
+{%- if customer -%}
+  {%- assign has_limit_tag = false -%}
+  {%- assign has_akima_tag = false -%}
+  {%- assign has_akima_company_tag = false -%}
+  {%- for tag in customer.tags -%}
+    {%- assign tag_lower = tag | downcase | strip -%}
+    {%- if tag_lower == 'limit' -%}
+      {%- assign has_limit_tag = true -%}
+    {%- endif -%}
+    {%- if tag_lower == 'akima' -%}
+      {%- assign has_akima_tag = true -%}
+    {%- endif -%}
+    {%- assign tag_prefix = tag_lower | slice: 0, 6 -%}
+    {%- if tag_prefix == 'akima ' -%}
+      {%- assign has_akima_company_tag = true -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- if has_limit_tag -%}
+    {%- assign is_limited_customer = true -%}
+  {%- endif -%}
+  {%- if has_akima_tag and has_limit_tag and has_akima_company_tag -%}
+    {%- assign is_akima_company_customer = true -%}
+  {%- endif -%}
+{%- endif -%}
+
+{%- if is_limited_customer and is_akima_company_customer == false -%}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Enforce max quantity of 1 for all quantity inputs
+    function enforceQuantityLimit() {
+      document.querySelectorAll('input[name="quantity"], input[name="updates[]"]').forEach(function(input) {
+        if (parseInt(input.value, 10) > 1) {
+          input.value = 1;
+        }
+        input.setAttribute('max', '1');
+        input.setAttribute('readonly', 'readonly');
+      });
+    }
+
+    // Run initially
+    enforceQuantityLimit();
+
+    // Observe DOM changes for dynamically added elements
+    var observer = new MutationObserver(enforceQuantityLimit);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Intercept cart API calls to enforce quantity limit
+    var originalFetch = window.fetch;
+    window.fetch = function(url, options) {
+      if (typeof url === 'string' && (url.includes('/cart/add') || url.includes('/cart/change') || url.includes('/cart/update'))) {
+        if (options && options.body) {
+          try {
+            var body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+            if (body.quantity && body.quantity > 1) {
+              body.quantity = 1;
+              options.body = JSON.stringify(body);
+            }
+            if (body.updates) {
+              body.updates = body.updates.map(function(qty) { return Math.min(qty, 1); });
+              options.body = JSON.stringify(body);
+            }
+          } catch (e) {
+            // If body parsing fails, continue with original request
+          }
+        }
+      }
+      return originalFetch.apply(this, arguments);
+    };
+  });
+</script>
+{%- endif -%}

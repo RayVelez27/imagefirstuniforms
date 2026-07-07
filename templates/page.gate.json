@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "main": {
+      "type": "password-gate",
+      "settings": {}
+    }
+  },
+  "order": ["main"]
+}

@@ -1,0 +1,95 @@
+{%- comment -%}
+  Akima Store session bar
+
+  A slim bar pinned above the header that lets password-gate visitors exit the
+  "Akima Store mode" session. Hidden by default; shown only when the
+  `akima-store-mode` class is present on <html> (set in snippets/akima-store-mode.liquid
+  from the sessionStorage gate flag). Because that class is applied in <head>
+  before paint, the bar never flashes for regular visitors.
+
+  Exit clears the session flag and the saved order mode, then returns the
+  visitor to the password gate page.
+
+  Client-side only — see notes in password-gate.liquid.
+{%- endcomment -%}
+
+<div class="akima-store-bar" role="region" aria-label="Akima store session">
+  <div class="akima-store-bar__inner">
+    <span class="akima-store-bar__label">You're shopping the Akima store</span>
+    <button type="button" class="akima-store-bar__exit" id="AkimaStoreExit">Exit store</button>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById('AkimaStoreExit');
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+      try {
+        sessionStorage.removeItem('akima-store-gate');
+        sessionStorage.removeItem('orderMode');
+        sessionStorage.removeItem('akima-cart-tagged');
+      } catch (e) {}
+
+      // Clear the Akima Store marker from the cart (empty value removes the
+      // attribute) so a later non-gated order isn't tagged, then return to the gate.
+      fetch('/cart/update.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attributes: { '_akima_store': '' } })
+      }).catch(function () {}).then(function () {
+        window.location.href = '/pages/akima-store';
+      });
+    });
+  })();
+</script>
+
+<style>
+  .akima-store-bar {
+    display: none;
+  }
+
+  .akima-store-mode .akima-store-bar {
+    display: block;
+  }
+
+  .akima-store-bar {
+    background: rgb(var(--header-background));
+    color: rgb(var(--header-text-color));
+    font-size: 14px;
+  }
+
+  .akima-store-bar__inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    max-width: var(--container-width, 1200px);
+    margin: 0 auto;
+    padding: 8px 20px;
+  }
+
+  .akima-store-bar__label {
+    opacity: 0.9;
+  }
+
+  .akima-store-bar__exit {
+    appearance: none;
+    cursor: pointer;
+    border: 1px solid rgba(var(--header-text-color), 0.5);
+    background: transparent;
+    color: rgb(var(--header-text-color));
+    font: inherit;
+    line-height: 1;
+    padding: 6px 14px;
+    border-radius: var(--button-border-radius, 0);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+
+  .akima-store-bar__exit:hover {
+    background: rgba(var(--header-text-color), 0.12);
+    border-color: rgb(var(--header-text-color));
+  }
+</style>

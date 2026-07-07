@@ -1,0 +1,406 @@
+{%- comment -%}
+  Manager Dashboard - Settings Tab
+  Extended manager settings for company-wide configurations
+{%- endcomment -%}
+
+{%- comment -%}Check if customer has Extended tag and Blue Life Security tag{%- endcomment -%}
+{%- assign is_extended_customer = false -%}
+{%- assign is_bls_manager = false -%}
+{%- assign is_akima_manager = false -%}
+{%- assign company_slug = '' -%}
+{%- if customer -%}
+  {%- assign customer_tags_lower = customer.tags | join: ',' | downcase -%}
+  {%- if customer_tags_lower contains 'extended' -%}
+    {%- assign is_extended_customer = true -%}
+  {%- endif -%}
+  {%- if customer_tags_lower contains 'blue life security' -%}
+    {%- assign is_bls_manager = true -%}
+    {%- assign company_slug = 'blue-life-security' -%}
+  {%- elsif customer_tags_lower contains 'akima' -%}
+    {%- assign is_akima_manager = true -%}
+    {%- assign company_slug = 'akima' -%}
+  {%- elsif customer_tags_lower contains 'gfs - uscis' -%}
+    {%- assign company_slug = 'gfs-uscis' -%}
+  {%- endif -%}
+{%- endif -%}
+
+<div class="dashboard-settings" data-extended-customer="{{ is_extended_customer }}">
+  <div class="dashboard-section-header">
+    <h2 class="heading h3">
+      {%- if company_slug == 'blue-life-security' -%}Blue Life Security - Company Settings
+      {%- elsif company_slug == 'akima' -%}Akima - Company Settings
+      {%- elsif company_slug == 'gfs-uscis' -%}GFS USCIS - Company Settings
+      {%- else -%}Company Settings
+      {%- endif -%}
+    </h2>
+    <p class="dashboard-description">Manage global settings for your company.</p>
+  </div>
+
+  <form id="company-settings-form" class="settings-form">
+
+    <div class="settings-section">
+      <h3 class="settings-section-title">Global Billing Address</h3>
+      <p class="settings-section-description">This address will be used as the default billing address for all company orders.</p>
+
+      <div class="settings-grid">
+        <div class="form-group">
+          <label for="billing-first-name">First Name</label>
+          <input type="text" id="billing-first-name" name="billingFirstName">
+        </div>
+        <div class="form-group">
+          <label for="billing-last-name">Last Name</label>
+          <input type="text" id="billing-last-name" name="billingLastName">
+        </div>
+        {%- if is_extended_customer -%}
+        <div class="form-group full-width">
+          <label for="billing-company-name">Company Name</label>
+          <input type="text" id="billing-company-name" name="billingCompanyName">
+        </div>
+        {%- endif -%}
+        <div class="form-group full-width">
+          <label for="billing-address">Address</label>
+          <input type="text" id="billing-address" name="billingAddress">
+        </div>
+        <div class="form-group full-width">
+          <label for="billing-address2">Address 2</label>
+          <input type="text" id="billing-address2" name="billingAddress2">
+        </div>
+        <div class="form-group">
+          <label for="billing-city">City</label>
+          <input type="text" id="billing-city" name="billingCity">
+        </div>
+        <div class="form-group">
+          <label for="billing-state">State/Province</label>
+          <input type="text" id="billing-state" name="billingState">
+        </div>
+        <div class="form-group">
+          <label for="billing-zip">Zip/Postal Code</label>
+          <input type="text" id="billing-zip" name="billingZip">
+        </div>
+        <div class="form-group">
+          <label for="billing-country">Country</label>
+          <select id="billing-country" name="billingCountry">
+            <option value="">Select Country</option>
+            <option value="US">United States</option>
+            <option value="CA">Canada</option>
+            <option value="MX">Mexico</option>
+            <option value="GB">United Kingdom</option>
+            <option value="AU">Australia</option>
+            <option value="DE">Germany</option>
+            <option value="FR">France</option>
+            <option value="IT">Italy</option>
+            <option value="ES">Spain</option>
+            <option value="NL">Netherlands</option>
+            <option value="BE">Belgium</option>
+            <option value="AT">Austria</option>
+            <option value="CH">Switzerland</option>
+            <option value="JP">Japan</option>
+            <option value="CN">China</option>
+            <option value="IN">India</option>
+            <option value="BR">Brazil</option>
+            <option value="AR">Argentina</option>
+          </select>
+        </div>
+        {%- unless is_extended_customer -%}
+        <div class="form-group">
+          <label for="billing-email">Email</label>
+          <input type="email" id="billing-email" name="billingEmail">
+        </div>
+        {%- endunless -%}
+        <div class="form-group">
+          <label for="billing-phone">Phone</label>
+          <input type="tel" id="billing-phone" name="billingPhone">
+        </div>
+      </div>
+
+      <div class="section-actions">
+        <button type="button" id="save-billing-btn" class="button button--primary">Save Billing Address</button>
+        <span id="billing-success" class="section-success" style="display: none;">Saved!</span>
+        <span id="billing-error" class="section-error" style="display: none;"></span>
+      </div>
+    </div>
+
+    {%- unless is_bls_manager or is_akima_manager -%}
+    <div class="settings-section">
+      <h3 class="settings-section-title">Email Notifications</h3>
+      <p class="settings-section-description">Order confirmations and notifications will be sent to these addresses.</p>
+
+      <div class="settings-grid">
+        <div class="form-group">
+          <label for="notify-primary">Primary Email</label>
+          <input type="email" id="notify-primary" name="notifyPrimary">
+        </div>
+        <div class="form-group">
+          <label for="notify-secondary">Secondary Email</label>
+          <input type="email" id="notify-secondary" name="notifySecondary">
+        </div>
+      </div>
+
+      <div class="section-actions">
+        <button type="button" id="save-notifications-btn" class="button button--primary">Save Notifications</button>
+        <span id="notifications-success" class="section-success" style="display: none;">Saved!</span>
+        <span id="notifications-error" class="section-error" style="display: none;"></span>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3 class="settings-section-title">Global PO Number</h3>
+      <p class="settings-section-description">This PO number will be applied to all company orders.</p>
+
+      <div class="settings-grid">
+        <div class="form-group">
+          <label for="global-po">PO Number</label>
+          <input type="text" id="global-po" name="globalPO">
+        </div>
+      </div>
+
+      <div class="section-actions">
+        <button type="button" id="save-po-btn" class="button button--primary">Save PO Number</button>
+        <span id="po-success" class="section-success" style="display: none;">Saved!</span>
+        <span id="po-error" class="section-error" style="display: none;"></span>
+      </div>
+    </div>
+    {%- endunless -%}
+  </form>
+</div>
+
+<style>
+  .dashboard-settings {
+    max-width: 800px;
+  }
+
+  .settings-form {
+    margin-top: 20px;
+  }
+
+  .settings-section {
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 25px;
+    margin-bottom: 25px;
+  }
+
+  .settings-section-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+  }
+
+  .settings-section-description {
+    color: #666;
+    font-size: 14px;
+    margin: 0 0 20px 0;
+  }
+
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+  }
+
+  .settings-grid .form-group {
+    margin-bottom: 0;
+  }
+
+  .settings-grid .form-group.full-width {
+    grid-column: 1 / -1;
+  }
+
+  .settings-grid .form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    font-size: 14px;
+  }
+
+  .settings-grid .form-group input,
+  .settings-grid .form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+    background-color: #fff;
+  }
+
+  .settings-grid .form-group input:focus,
+  .settings-grid .form-group select:focus {
+    outline: none;
+    border-color: #4CAF50;
+  }
+
+  .section-actions {
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+
+  .section-success {
+    color: #2e7d32;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .section-error {
+    color: #d32f2f;
+    font-size: 14px;
+  }
+
+  @media (max-width: 600px) {
+    .settings-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script>
+  const SETTINGS_API_BASE = 'https://image-first-portal.netlify.app/.netlify/functions';
+  const companyId = {{ company_slug | json }};
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const settingsTab = document.querySelector('[data-tab="tab-settings"]');
+    let settingsLoaded = false;
+
+    if (settingsTab) {
+      settingsTab.addEventListener('click', function() {
+        if (!settingsLoaded) {
+          loadGlobalSettings();
+          settingsLoaded = true;
+        }
+      });
+    }
+
+    // Attach save handlers for each section
+    document.getElementById('save-billing-btn').addEventListener('click', handleSaveBilling);
+    var notificationsBtn = document.getElementById('save-notifications-btn');
+    if (notificationsBtn) notificationsBtn.addEventListener('click', handleSaveNotifications);
+    var poBtn = document.getElementById('save-po-btn');
+    if (poBtn) poBtn.addEventListener('click', handleSavePO);
+  });
+
+  async function loadGlobalSettings() {
+    try {
+      var url = `${SETTINGS_API_BASE}/get-global-settings`;
+      if (companyId) url += '?company=' + encodeURIComponent(companyId);
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.error) {
+        console.log('No existing settings found');
+        return;
+      }
+
+      if (data.settings) {
+        populateForm(data.settings);
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  }
+
+  function populateForm(settings) {
+    const fieldMap = {
+      'billing-first-name': settings.billingFirstName,
+      'billing-last-name': settings.billingLastName,
+      'billing-company-name': settings.billingCompanyName,
+      'billing-address': settings.billingAddress,
+      'billing-address2': settings.billingAddress2,
+      'billing-city': settings.billingCity,
+      'billing-state': settings.billingState,
+      'billing-zip': settings.billingZip,
+      'billing-country': settings.billingCountry,
+      'billing-email': settings.billingEmail,
+      'billing-phone': settings.billingPhone,
+      'notify-primary': settings.notifyPrimary,
+      'notify-secondary': settings.notifySecondary,
+      'global-po': settings.globalPO
+    };
+
+    for (const [fieldId, value] of Object.entries(fieldMap)) {
+      const field = document.getElementById(fieldId);
+      if (field && value) {
+        field.value = value;
+      }
+    }
+  }
+
+  async function saveSection(sectionData, btnId, successId, errorId, btnText) {
+    const btn = document.getElementById(btnId);
+    const successEl = document.getElementById(successId);
+    const errorEl = document.getElementById(errorId);
+
+    try {
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      successEl.style.display = 'none';
+      errorEl.style.display = 'none';
+
+      if (companyId) sectionData.company = companyId;
+      const response = await fetch(`${SETTINGS_API_BASE}/save-global-settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sectionData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Failed to save');
+      }
+
+      successEl.textContent = 'Saved!';
+      successEl.style.display = 'inline';
+
+      // Hide success message after 3 seconds
+      setTimeout(() => {
+        successEl.style.display = 'none';
+      }, 3000);
+
+    } catch (error) {
+      console.error('Error saving:', error);
+      errorEl.textContent = error.message || 'Failed to save. Please try again.';
+      errorEl.style.display = 'inline';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = btnText;
+    }
+  }
+
+  function handleSaveBilling() {
+    const companyNameField = document.getElementById('billing-company-name');
+    const emailField = document.getElementById('billing-email');
+
+    const data = {
+      billingFirstName: document.getElementById('billing-first-name').value,
+      billingLastName: document.getElementById('billing-last-name').value,
+      billingCompanyName: companyNameField ? companyNameField.value : '',
+      billingAddress: document.getElementById('billing-address').value,
+      billingAddress2: document.getElementById('billing-address2').value,
+      billingCity: document.getElementById('billing-city').value,
+      billingState: document.getElementById('billing-state').value,
+      billingZip: document.getElementById('billing-zip').value,
+      billingCountry: document.getElementById('billing-country').value,
+      billingEmail: emailField ? emailField.value : '',
+      billingPhone: document.getElementById('billing-phone').value
+    };
+    saveSection(data, 'save-billing-btn', 'billing-success', 'billing-error', 'Save Billing Address');
+  }
+
+  function handleSaveNotifications() {
+    const data = {
+      notifyPrimary: document.getElementById('notify-primary').value,
+      notifySecondary: document.getElementById('notify-secondary').value
+    };
+    saveSection(data, 'save-notifications-btn', 'notifications-success', 'notifications-error', 'Save Notifications');
+  }
+
+  function handleSavePO() {
+    const data = {
+      globalPO: document.getElementById('global-po').value
+    };
+    saveSection(data, 'save-po-btn', 'po-success', 'po-error', 'Save PO Number');
+  }
+</script>

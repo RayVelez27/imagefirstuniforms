@@ -1,0 +1,231 @@
+<desktop-navigation>
+  <ul class="header__linklist list--unstyled {% unless bottom_navigation %}hidden-pocket hidden-lap{% endunless %}" role="list">
+    {%- for link in menu.links -%}
+      {%- assign link_title_downcase = link.title | strip | downcase -%}
+      {%- assign mega_menu_block = '' -%}
+      {%- assign mega_menu_images = '' -%}
+
+      {%- for block in section.blocks -%}
+        {%- assign menu_item_downcase = block.settings.menu_item | strip | downcase -%}
+
+        {%- if menu_item_downcase == link_title_downcase -%}
+          {%- assign mega_menu_block = block -%}
+          {%- break -%}
+        {%- endif -%}
+      {%- endfor -%}
+
+      {%- comment -%} B2B Portal smart redirect logic {%- endcomment -%}
+      {%- assign final_url = link.url -%}
+      {%- if link.title == 'Shop' and customer and customer.tags.size > 0 -%}
+        {%- comment -%} Check if user is disabled - if so, redirect to b2b-portal2 instead of company page {%- endcomment -%}
+        {%- assign is_disabled = false -%}
+        {%- for tag in customer.tags -%}
+          {%- assign tag_lower = tag | downcase -%}
+          {%- if tag_lower == 'disabled' -%}
+            {%- assign is_disabled = true -%}
+            {%- break -%}
+          {%- endif -%}
+        {%- endfor -%}
+
+        {%- if is_disabled -%}
+          {%- assign final_url = '/pages/b2b-portal2' -%}
+        {%- else -%}
+          {%- comment -%}
+            ========================================================
+            TAG-TO-COLLECTION MAPPING
+            Automatically routes "GFS USCIS [State]" tags to collections
+            Also supports custom tag mappings below
+            ========================================================
+          {%- endcomment -%}
+          {%- assign collection_route_found = false -%}
+
+          {%- comment -%} Auto-detect GFS USCIS [State] tags and route to /collections/gfs-uscis-[state] {%- endcomment -%}
+          {%- for tag in customer.tags -%}
+            {%- assign tag_lower = tag | downcase -%}
+            {%- if tag_lower contains 'gfs uscis' -%}
+              {%- assign tag_handle = tag | handle -%}
+              {%- assign final_url = '/collections/' | append: tag_handle -%}
+              {%- assign collection_route_found = true -%}
+              {%- break -%}
+            {%- endif -%}
+          {%- endfor -%}
+
+          {%- comment -%} ADD MORE CUSTOM TAG-TO-COLLECTION MAPPINGS BELOW {%- endcomment -%}
+          {%- comment -%} Example for non-GFS tags:
+          {%- assign customer_tags_lower = customer.tags | join: '|||' | downcase -%}
+          {%- if collection_route_found == false and customer_tags_lower contains 'other company' -%}
+            {%- assign final_url = '/collections/other-company-collection' -%}
+            {%- assign collection_route_found = true -%}
+          {%- endif -%}
+          {%- endcomment -%}
+
+          {%- comment -%} If no collection mapping found, fall back to original page-based logic {%- endcomment -%}
+          {%- unless collection_route_found -%}
+          {%- assign valid_tags = "" -%}
+          {%- for tag in customer.tags -%}
+            {%- assign tag_lower = tag | downcase -%}
+            {%- unless tag_lower contains 'manager' -%}
+              {%- assign tag_handle = tag | handle -%}
+              {%- assign page_handle = pages[tag_handle].handle -%}
+              {%- if page_handle -%}
+                {%- if valid_tags == blank -%}
+                  {%- assign valid_tags = page_handle -%}
+                {%- else -%}
+                  {%- assign valid_tags = valid_tags | append: "," | append: page_handle -%}
+                {%- endif -%}
+              {%- endif -%}
+            {%- endunless -%}
+          {%- endfor -%}
+          {%- if valid_tags != blank -%}
+            {%- assign valid_tags_array = valid_tags | split: "," -%}
+            {%- assign first_tag = valid_tags_array.first -%}
+            {%- assign final_url = '/pages/' | append: first_tag -%}
+          {%- endif -%}
+          {%- endunless -%}
+        {%- endif -%}
+      {%- endif -%}
+
+      <li class="header__linklist-item {% if link.links.size > 0 or mega_menu_block != '' %}has-dropdown{% endif %}" data-item-title="{{ link.title | escape }}">
+        <a class="header__linklist-link link--animated" href="{{ final_url }}" {% if link.links.size > 0 or mega_menu_block != '' %}aria-controls="desktop-menu-{{ forloop.index }}" aria-expanded="false"{% endif %}>
+          {{- link.title -}}
+        </a>
+
+        {%- if mega_menu_block != '' -%}
+          {%- assign images_count = 0 -%}
+
+          {%- capture mega_menu_images -%}
+            {%- for i in (1..6) -%}
+              {%- capture image_setting -%}image_{{ i }}{%- endcapture -%}
+
+              {%- if mega_menu_block.settings[image_setting] != blank -%}
+                {%- assign images_count = images_count | plus: 1 -%}
+
+                {%- capture image_heading_setting -%}image_{{ i }}_heading{%- endcapture -%}
+                {%- capture image_text_setting -%}image_{{ i }}_text{%- endcapture -%}
+                {%- capture image_link_setting -%}image_{{ i }}_link{%- endcapture -%}
+
+                {%- capture image_push -%}
+                  <div class="mega-menu__image-wrapper">
+                    {%- assign menu_image = mega_menu_block.settings[image_setting] -%}
+                    {{ menu_image | image_url: width: menu_image.width | image_tag: loading: 'lazy', sizes: '240px', sizes: '240,480,720', class: 'mega-menu__image' }}
+                  </div>
+
+                  {%- if mega_menu_block.settings[image_heading_setting] != '' -%}
+                    <p class="mega-menu__heading heading heading--small">{{ mega_menu_block.settings[image_heading_setting] }}</p>
+                  {%- endif -%}
+
+                  {%- if mega_menu_block.settings[image_text_setting] != '' -%}
+                    <span class="mega-menu__text">{{ mega_menu_block.settings[image_text_setting] }}</span>
+                  {%- endif -%}
+                {%- endcapture -%}
+
+                {%- if mega_menu_block.settings[image_link_setting] != blank -%}
+                  <a href="{{ mega_menu_block.settings[image_link_setting] }}" class="mega-menu__image-push image-zoom">
+                    {{- image_push -}}
+                  </a>
+                {%- else -%}
+                  <div class="mega-menu__image-push image-zoom">
+                    {{- image_push -}}
+                  </div>
+                {%- endif -%}
+              {%- endif -%}
+            {%- endfor -%}
+          {%- endcapture -%}
+
+          {%- if link.links.size > 0 or mega_menu_images != blank -%}
+            <div hidden id="desktop-menu-{{ forloop.index }}" class="mega-menu" {{ mega_menu_block.shopify_attributes }}>
+              <div class="container">
+                <div class="mega-menu__inner">
+                  {%- if mega_menu_block.settings.images_position == 'left' and mega_menu_images != blank -%}
+                    <div class="mega-menu__images-wrapper {% if images_count >= 3 %}mega-menu__images-wrapper--tight{% endif %}">
+                      {{- mega_menu_images -}}
+                    </div>
+                  {%- endif -%}
+
+                  {%- if link.links.size > 0 -%}
+                    <div class="mega-menu__columns-wrapper">
+                      {%- for sub_link in link.links -%}
+                        <div class="mega-menu__column">
+                          {%- if sub_link.url == '#' -%}
+                            <span class="mega-menu__title heading heading--small">{{ sub_link.title }}</span>
+                          {%- else -%}
+                            <a href="{{ sub_link.url }}" class="mega-menu__title heading heading--small">{{ sub_link.title }}</a>
+                          {%- endif -%}
+
+                          {%- if sub_link.links.size > 0 -%}
+                            <ul class="linklist list--unstyled" role="list">
+                              {%- for sub_sub_link in sub_link.links -%}
+                                <li class="linklist__item">
+                                  <a href="{{ sub_sub_link.url }}" class="link--faded">{{ sub_sub_link.title }}</a>
+                                </li>
+                              {%- endfor -%}
+                            </ul>
+                          {%- endif -%}
+                        </div>
+                      {%- endfor -%}
+                    </div>
+                  {%- endif -%}
+
+                  {%- if mega_menu_block.settings.images_position == 'right' and mega_menu_images != blank -%}
+                    <div class="mega-menu__images-wrapper {% if images_count >= 3 %}mega-menu__images-wrapper--tight{% endif %}">
+                      {{- mega_menu_images -}}
+                    </div>
+                  {%- endif -%}
+                </div>
+              </div>
+            </div>
+          {%- endif -%}
+        {%- elsif link.links.size > 0 -%}
+          <ul hidden id="desktop-menu-{{ forloop.index }}" class="nav-dropdown {% if link.levels == 1 %}nav-dropdown--restrict{% endif %} list--unstyled" role="list">
+            {%- for sub_link in link.links -%}
+              <li class="nav-dropdown__item {% if sub_link.links.size > 0 %}has-dropdown{% endif %}">
+                <a class="nav-dropdown__link link--faded" href="{{ sub_link.url }}" {% if sub_link.links.size > 0 %}aria-controls="desktop-menu-{{ forloop.parentloop.index }}-{{ forloop.index }}" aria-expanded="false"{% endif %}>
+                  {{- sub_link.title -}}
+
+                  {%- if sub_link.links.size > 0 -%}
+                    {% render 'icon' with 'dropdown-arrow-right', direction_aware: true %}
+                  {%- endif -%}
+                </a>
+
+                {%- if sub_link.links.size > 0 -%}
+                  <ul hidden id="desktop-menu-{{ forloop.parentloop.index }}-{{ forloop.index }}" class="nav-dropdown list--unstyled" role="list">
+                    {%- for sub_sub_link in sub_link.links -%}
+                      <li class="nav-dropdown__item">
+                        <a class="nav-dropdown__link link--faded" href="{{ sub_sub_link.url }}">{{ sub_sub_link.title }}</a>
+                      </li>
+                    {%- endfor -%}
+                  </ul>
+                {%- endif -%}
+              </li>
+            {%- endfor -%}
+          </ul>
+        {%- endif -%}
+      </li>
+
+      {%- comment -%}
+        Inject "Dashboard" link right after "Shop" if user has BOTH "Manager" tag AND a company tag
+      {%- endcomment -%}
+      {% if link.title == 'Shop' and customer and customer.tags != blank %}
+        {%- assign has_manager_tag = false -%}
+        {%- assign has_company_tag = false -%}
+        {%- for tag in customer.tags -%}
+          {%- assign tag_lower = tag | downcase -%}
+          {%- if tag_lower contains 'manager' -%}
+            {%- assign has_manager_tag = true -%}
+          {%- elsif tag_lower != 'admin' and tag_lower != 'administrator' and tag_lower != 'user' and tag_lower != 'employee' and tag_lower != 'disabled' -%}
+            {%- comment -%} This is likely a company tag {%- endcomment -%}
+            {%- assign has_company_tag = true -%}
+          {%- endif -%}
+        {%- endfor -%}
+
+        {% if has_manager_tag and has_company_tag %}
+          <li class="header__linklist-item">
+            <a class="header__linklist-link link--animated" href="/pages/manager-dashboard">
+              Dashboard
+            </a>
+          </li>
+        {% endif %}
+      {% endif %}
+    {%- endfor -%}
+  </ul>
+</desktop-navigation>

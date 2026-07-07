@@ -1,0 +1,133 @@
+{%- comment -%}
+  Akima Store mode (client-side)
+
+  Visitors who entered the password gate this session have
+  sessionStorage 'akima-store-gate' = 'granted' (set by sections/password-gate.liquid).
+  This adds an `akima-store-mode` class to <html> as early as possible so CSS can
+  adjust the UI for them site-wide — currently: hide the Regular/Bulk order toggle
+  on product pages.
+
+  It also forces the product form's saved order mode to "regular". The product
+  form (snippets/product-form.liquid) restores the previously chosen mode from
+  sessionStorage 'orderMode' on DOMContentLoaded, so without this a visitor who
+  had picked "Bulk Order" earlier this session would silently stay in bulk mode
+  even though the toggle is hidden. This script runs in <head>, before that
+  handler, so "regular" wins.
+
+  Root route ends the session: if a visitor in Akima Store mode navigates to the
+  homepage (request.page_type == 'index', the root route), we treat it like
+  hitting "Exit Store" — clear the session flags and the cart marker so the
+  akima-store-mode class is never added here and the nav bar disappears.
+
+  Rendered in the <head> so the class is set before paint (no flash of the toggle).
+  Client-side only — see notes in password-gate.liquid.
+{%- endcomment -%}
+
+<script>
+  (function () {
+    try {
+      {%- if request.page_type == 'index' -%}
+      // Root route: end any active Akima Store session (mirrors the "Exit Store"
+      // button in sections/header.liquid). Clear the flags synchronously so the
+      // akima-store-mode class below is skipped and the nav bar never shows, then
+      // drop the cart's Akima Store marker so later non-gated orders aren't tagged.
+      if (sessionStorage.getItem('akima-store-gate') === 'granted') {
+        sessionStorage.removeItem('akima-store-gate');
+        sessionStorage.removeItem('orderMode');
+        sessionStorage.removeItem('akima-cart-tagged');
+        fetch('/cart/update.js', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ attributes: { '_akima_store': '' } })
+        }).catch(function () {});
+      }
+      {%- else -%}
+      if (sessionStorage.getItem('akima-store-gate') === 'granted') {
+        document.documentElement.classList.add('akima-store-mode');
+        sessionStorage.setItem('orderMode', 'regular');
+
+        // Stamp the cart with an Akima Store marker so it carries into checkout.
+        // Cart attributes flow into the created order's note_attributes, where the
+        // orders/create webhook (netlify/functions/tag-akima-order.js) reads it and
+        // tags both the order and the customer with "Akima Store".
+        // Guarded by a session flag so it only fires once per session.
+        if (sessionStorage.getItem('akima-cart-tagged') !== '1') {
+          fetch('/cart/update.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ attributes: { '_akima_store': 'true' } })
+          }).then(function () {
+            sessionStorage.setItem('akima-cart-tagged', '1');
+          }).catch(function () {});
+        }
+      }
+      {%- endif -%}
+    } catch (e) {}
+  })();
+</script>
+
+<style>
+  /* Hide the Regular Order / Bulk Order toggle for password-gate visitors */
+  .akima-store-mode .product-form__order-mode-toggle { display: none !important; }
+
+  /*
+    Akima Store mode header:
+    Once the password gate is passed, strip the header down to logo + cart —
+    hide the hamburger menu and the account/login icon, and reveal the cart that
+    stands in for the account icon (see sections/header.liquid .header__akima-cart).
+  */
+  /*
+    Hidden by default. !important is required because theme.css loads after this
+    inline style and its `.header__icon-wrapper { display: block }` rule has equal
+    specificity — without !important it would win the cascade and leak the cart
+    onto every page before the gate is passed.
+  */
+  .header__akima-cart { display: none !important; }
+
+  .akima-store-mode .header__hamburger,
+  .akima-store-mode .header__account-link { display: none !important; }
+
+  /* More specific than the hide rule above, so it wins once the gate is passed. */
+  .akima-store-mode .header__akima-cart { display: block !important; }
+
+  /*
+    Akima Store mode nav control: the "Exit store" button (on the akima-store
+    collection) / "Back Home" link (everywhere else) that sits on the left side
+    of the nav bar. Hidden by default; revealed only in Akima Store mode. Styled
+    here in <head> so it never flashes for regular visitors.
+  */
+  .header__akima-nav { display: none !important; }
+
+  .akima-store-mode .header__akima-nav {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+    appearance: none;
+    cursor: pointer;
+    border: 1px solid rgba(var(--header-text-color), 0.4);
+    background: transparent;
+    color: rgb(var(--header-text-color));
+    font: inherit;
+    font-size: 14px;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    padding: 8px 14px;
+    border-radius: var(--button-border-radius, 0);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+
+  .akima-store-mode .header__akima-nav:hover {
+    background: rgba(var(--header-text-color), 0.12);
+    border-color: rgb(var(--header-text-color));
+  }
+
+  .header__akima-nav-arrow { font-size: 16px; line-height: 1; }
+
+  /*
+    Akima Store mode cart (/cart): password-gate visitors pay immediately.
+    Hide the "Pay Later" button (leaving only "Pay Now") and the PO Number field.
+  */
+  .akima-store-mode .cart__pay-later-button { display: none !important; }
+  .akima-store-mode .cart-attributes__field--po { display: none !important; }
+</style>

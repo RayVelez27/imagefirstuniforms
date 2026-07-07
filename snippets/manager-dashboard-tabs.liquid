@@ -1,0 +1,21 @@
+{%- comment -%}
+  Manager Dashboard Tabs Navigation
+  Renders the tab buttons for switching between different dashboard views
+
+  Parameters:
+  - is_extended_manager: Boolean - if true, shows Settings tab
+{%- endcomment -%}
+
+<div class="dashboard-tabs">
+  <button class="dashboard-tab active" data-tab="tab-orders">
+    <span>Orders</span>
+  </button>
+  <button class="dashboard-tab" data-tab="tab-users">
+    <span>Users</span>
+  </button>
+  {%- if is_extended_manager -%}
+  <button class="dashboard-tab" data-tab="tab-settings">
+    <span>Settings</span>
+  </button>
+  {%- endif -%}
+</div>

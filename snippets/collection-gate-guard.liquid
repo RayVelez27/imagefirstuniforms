@@ -1,0 +1,39 @@
+{%- comment -%}
+  Collection gate guard
+
+  Drop this at the very top of a gated collection template. It hides the page
+  until JS confirms the visitor unlocked the gate this session; otherwise it
+  redirects them back to the password gate page.
+
+  Usage:
+    {% render 'collection-gate-guard', gate_url: '/pages/akima-store' %}
+
+  Pair with sections/password-gate.liquid, which sets the same sessionStorage key.
+  Client-side only — see notes in password-gate.liquid.
+{%- endcomment -%}
+
+{%- liquid
+  assign storage_key = 'akima-store-gate'
+  assign storage_value = 'granted'
+  assign gate_url = gate_url | default: '/pages/akima-store'
+-%}
+
+<style id="GateHide">body { visibility: hidden !important; }</style>
+<noscript><style>body { visibility: visible !important; }</style></noscript>
+<script>
+  (function () {
+    var KEY = {{ storage_key | json }};
+    var VALUE = {{ storage_value | json }};
+    var GATE_URL = {{ gate_url | json }};
+
+    var granted = false;
+    try { granted = sessionStorage.getItem(KEY) === VALUE; } catch (e) {}
+
+    if (granted) {
+      var hide = document.getElementById('GateHide');
+      if (hide && hide.parentNode) hide.parentNode.removeChild(hide);
+    } else {
+      window.location.replace(GATE_URL);
+    }
+  })();
+</script>

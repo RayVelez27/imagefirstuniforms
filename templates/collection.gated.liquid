@@ -1,0 +1,14 @@
+{%- comment -%}
+  Gated collection template
+
+  Assign this template to the protected collection (e.g. "akima-store") in the
+  Shopify admin: Collection > Theme template > "gated".
+
+  The guard runs first and redirects any visitor who did not unlock the gate
+  this session. Update gate_url below if the password page uses a different handle.
+{%- endcomment -%}
+
+{% render 'collection-gate-guard', gate_url: '/pages/akima-store' %}
+
+{% section 'collection-banner' %}
+{% section 'main-collection' %}

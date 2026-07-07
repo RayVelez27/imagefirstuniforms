@@ -1,0 +1,811 @@
+
+{%- unless product.has_only_default_variant -%}
+  <div class="bulk-variant-selector" data-bulk-variant-selector>
+    <div class="bulk-variant-selector__header">
+      <h3 class="bulk-variant-selector__title heading h6">{{ 'product.bulk_selector.title' | t | default: 'Bulk Order Options' }}</h3>
+      <p class="bulk-variant-selector__description text--subdued">{{ 'product.bulk_selector.description' | t | default: 'Select quantities for multiple variants at once' }}</p>
+    </div>
+
+    {%- comment -%}Variant Filters - only show if product has 2+ options{%- endcomment -%}
+    {%- if product.options_with_values.size > 1 -%}
+      <div class="bulk-variant-selector__filters">
+        {%- assign first_option = product.options_with_values.first -%}
+        <div class="bulk-variant-selector__filter">
+          <label class="bulk-variant-selector__filter-label" for="bulk-filter-option1">
+            {{ first_option.name }}:
+          </label>
+          <select class="bulk-variant-selector__filter-select" id="bulk-filter-option1" data-bulk-filter="0">
+            <option value="">{{ 'product.bulk_selector.all' | t | default: 'All' }} {{ first_option.name }}</option>
+            {%- for value in first_option.values -%}
+              <option value="{{ value | escape }}">{{ value }}</option>
+            {%- endfor -%}
+          </select>
+        </div>
+      </div>
+    {%- endif -%}
+
+    <div class="bulk-variant-selector__table-wrapper">
+      <div class="bulk-variant-selector__table-container">
+        <table class="bulk-variant-selector__table">
+          <thead>
+            <tr>
+              {%- for option in product.options_with_values -%}
+                <th class="bulk-variant-selector__header-cell">{{ option.name }}</th>
+              {%- endfor -%}
+              <th class="bulk-variant-selector__header-cell">{{ 'product.bulk_selector.price' | t | default: 'Price' }}</th>
+              <th class="bulk-variant-selector__header-cell">{{ 'product.bulk_selector.quantity' | t | default: 'Quantity' }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {%- for variant in product.variants -%}
+              <tr class="bulk-variant-selector__row {% unless variant.available %}bulk-variant-selector__row--unavailable{% endunless %}"
+                  data-variant-id="{{ variant.id }}"
+                  data-variant-available="{{ variant.available }}"
+                  data-variant-price="{{ variant.price }}"
+                  data-variant-compare-price="{{ variant.compare_at_price | default: variant.price }}"
+                  {%- for option_value in variant.options -%}
+                    data-option{{ forloop.index0 }}="{{ option_value | escape }}"
+                  {%- endfor -%}>
+                {%- for option_value in variant.options -%}
+                  <td class="bulk-variant-selector__cell">{{ option_value }}</td>
+                {%- endfor -%}
+                <td class="bulk-variant-selector__cell bulk-variant-selector__price">
+                  {%- if variant.compare_at_price > variant.price -%}
+                    <span class="bulk-variant-selector__compare-price text--subdued">{{ variant.compare_at_price | money }}</span>
+                    <span class="bulk-variant-selector__current-price">{{ variant.price | money }}</span>
+                  {%- else -%}
+                    <span class="bulk-variant-selector__current-price">{{ variant.price | money }}</span>
+                  {%- endif -%}
+                </td>
+                <td class="bulk-variant-selector__cell bulk-variant-selector__quantity">
+                  {%- if variant.available -%}
+                    <div class="bulk-variant-selector__quantity-wrapper">
+                      <input type="number"
+                             class="bulk-variant-selector__quantity-input"
+                             data-variant-quantity="{{ variant.id }}"
+                             min="0"
+                             max="99"
+                             value="0"
+                             {%- if variant.inventory_quantity > 0 and variant.inventory_management == 'shopify' -%}
+                               max="{{ variant.inventory_quantity }}"
+                               data-inventory-limit="{{ variant.inventory_quantity }}"
+                             {%- endif -%}
+                             aria-label="{{ 'product.bulk_selector.quantity_for' | t: variant: variant.title | default: variant.title }}">
+                      {%- if variant.inventory_quantity > 0 and variant.inventory_management == 'shopify' -%}
+                        <div class="bulk-variant-selector__inventory-info">
+                          <small class="text--subdued">{{ variant.inventory_quantity }} {{ 'product.bulk_selector.in_stock' | t | default: 'in stock' }}</small>
+                        </div>
+                      {%- endif -%}
+                    </div>
+                  {%- else -%}
+                    <span class="bulk-variant-selector__unavailable-text text--subdued">-</span>
+                  {%- endif -%}
+                </td>
+              </tr>
+              {%- if variant.available -%}
+                <tr class="bulk-variant-selector__instructions-row" data-variant-id="{{ variant.id }}"
+                    {%- for option_value in variant.options -%}
+                      data-option{{ forloop.index0 }}="{{ option_value | escape }}"
+                    {%- endfor -%}>
+                  <td colspan="{{ product.options_with_values.size | plus: 2 }}" class="bulk-variant-selector__cell bulk-variant-selector__instructions-cell">
+                    <input type="text"
+                           class="bulk-variant-selector__instructions-input"
+                           data-variant-instructions="{{ variant.id }}"
+                           placeholder="Special Instructions"
+                           aria-label="Special instructions for {{ variant.title }}">
+                  </td>
+                </tr>
+              {%- endif -%}
+            {%- endfor -%}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bulk-variant-selector__summary">
+      <div class="bulk-variant-selector__total">
+        <span class="bulk-variant-selector__total-label text--subdued">{{ 'product.bulk_selector.total_items' | t | default: 'Total Items' }}:</span>
+        <span class="bulk-variant-selector__total-count" data-bulk-total-count>0</span>
+      </div>
+      <div class="bulk-variant-selector__total">
+        <span class="bulk-variant-selector__total-label text--subdued">{{ 'product.bulk_selector.total_price' | t | default: 'Total Price' }}:</span>
+        <span class="bulk-variant-selector__total-price" data-bulk-total-price>{{ 0 | money }}</span>
+      </div>
+      <div class="bulk-variant-selector__total bulk-variant-selector__savings" style="display: none;">
+        <span class="bulk-variant-selector__total-label text--subdued">{{ 'product.bulk_selector.you_save' | t | default: 'You Save' }}:</span>
+        <span class="bulk-variant-selector__total-savings" data-bulk-total-savings>{{ 0 | money }}</span>
+      </div>
+    </div>
+
+    <div class="bulk-variant-selector__actions">
+      <button type="button"
+              class="bulk-variant-selector__add-btn button button--primary button--full"
+              data-bulk-add-all-btn
+              disabled>
+        {{ 'product.bulk_selector.add_all_to_cart' | t | default: 'Add All to Cart' }}
+      </button>
+      <button type="button"
+              class="bulk-variant-selector__clear-btn button button--secondary button--full"
+              data-bulk-clear-btn>
+        {{ 'product.bulk_selector.clear_all' | t | default: 'Clear All' }}
+      </button>
+    </div>
+  </div>
+
+  <style>
+  /* Bulk Variant Selector Styles */
+  .bulk-variant-selector {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    border: 1px solid rgb(var(--border-color));
+    border-radius: var(--border-radius);
+    background-color: rgb(var(--background));
+  }
+
+  .bulk-variant-selector__header {
+    margin-bottom: 1.5rem;
+    text-align: center;
+  }
+
+  .bulk-variant-selector__title {
+    margin: 0 0 0.5rem 0;
+  }
+
+  .bulk-variant-selector__description {
+    margin: 0;
+    font-size: 0.875rem;
+  }
+
+  .bulk-variant-selector__filters {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: rgba(var(--text-color), 0.03);
+    border-radius: var(--border-radius);
+    border: 1px solid rgb(var(--border-color));
+  }
+
+  .bulk-variant-selector__filter {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .bulk-variant-selector__filter-label {
+    font-weight: 600;
+    font-size: 0.875rem;
+    white-space: nowrap;
+  }
+
+  .bulk-variant-selector__filter-select {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid rgb(var(--border-color));
+    border-radius: var(--border-radius);
+    background-color: rgb(var(--background));
+    color: rgb(var(--text-color));
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+
+  .bulk-variant-selector__filter-select:focus {
+    outline: none;
+    border-color: rgb(var(--text-color));
+    box-shadow: 0 0 0 1px rgb(var(--text-color));
+  }
+
+  .bulk-variant-selector__row--filtered,
+  .bulk-variant-selector__instructions-row--filtered {
+    display: none;
+  }
+
+  .bulk-variant-selector__table-wrapper {
+    overflow-x: auto;
+    margin-bottom: 1.5rem;
+    border: 1px solid rgb(var(--border-color));
+    border-radius: var(--border-radius);
+  }
+
+  .bulk-variant-selector__table-container {
+    overflow-y: auto;
+    max-height: 400px;
+  }
+
+  .bulk-variant-selector__table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: rgb(var(--background));
+  }
+
+  .bulk-variant-selector__header-cell {
+    background-color: rgb(var(--text-color));
+    color: rgb(var(--background));
+    padding: 0.75rem 0.5rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .bulk-variant-selector__header-cell:last-child {
+    text-align: center;
+  }
+
+  .bulk-variant-selector__cell {
+    padding: 0.75rem 0.5rem;
+    border-bottom: 1px solid rgb(var(--border-color));
+    font-size: 0.875rem;
+    vertical-align: middle;
+  }
+
+  .bulk-variant-selector__row:hover {
+    background-color: rgba(var(--text-color), 0.03);
+  }
+
+  .bulk-variant-selector__row--unavailable {
+    opacity: 0.6;
+  }
+
+  .bulk-variant-selector__price {
+    white-space: nowrap;
+  }
+
+  .bulk-variant-selector__compare-price {
+    text-decoration: line-through;
+    margin-right: 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  .bulk-variant-selector__current-price {
+    font-weight: 600;
+  }
+
+  .bulk-variant-selector__availability {
+    text-align: center;
+  }
+
+  .bulk-variant-selector__badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: calc(var(--border-radius) / 2);
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .bulk-variant-selector__badge--success {
+    background-color: rgba(5, 150, 105, 0.1);
+    color: rgb(5, 150, 105);
+  }
+
+  .bulk-variant-selector__badge--error {
+    background-color: rgba(220, 38, 38, 0.1);
+    color: rgb(220, 38, 38);
+  }
+
+  .bulk-variant-selector__quantity {
+    text-align: center;
+    min-width: 120px;
+  }
+
+  .bulk-variant-selector__quantity-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+    width: 100%;
+  }
+
+  .bulk-variant-selector__quantity-input {
+    width: 70px;
+    padding: 0.5rem;
+    border: 1px solid rgb(var(--border-color));
+    border-radius: var(--border-radius);
+    text-align: center;
+    font-size: 0.875rem;
+    background-color: rgb(var(--background));
+    color: rgb(var(--text-color));
+  }
+
+  .bulk-variant-selector__quantity-input:focus {
+    outline: none;
+    border-color: rgb(var(--text-color));
+    box-shadow: 0 0 0 1px rgb(var(--text-color));
+  }
+
+  .bulk-variant-selector__instructions-row {
+    background-color: rgba(var(--text-color), 0.02);
+  }
+
+  .bulk-variant-selector__instructions-row:hover {
+    background-color: rgba(var(--text-color), 0.03);
+  }
+
+  .bulk-variant-selector__instructions-cell {
+    padding: 0.5rem 0.75rem !important;
+    border-bottom: 1px solid rgb(var(--border-color));
+  }
+
+  .bulk-variant-selector__instructions-input {
+    width: 100%;
+    max-width: 600px;
+    padding: 0.5rem;
+    border: 1px solid rgb(var(--border-color));
+    border-radius: var(--border-radius);
+    font-size: 0.8125rem;
+    background-color: rgb(var(--background));
+    color: rgb(var(--text-color));
+    font-family: inherit;
+  }
+
+  .bulk-variant-selector__instructions-input:focus {
+    outline: none;
+    border-color: rgb(var(--text-color));
+    box-shadow: 0 0 0 1px rgb(var(--text-color));
+  }
+
+  .bulk-variant-selector__instructions-input::placeholder {
+    color: rgba(var(--text-color), 0.5);
+    font-size: 0.8125rem;
+  }
+
+  .bulk-variant-selector__inventory-info {
+    margin-top: 0.25rem;
+    text-align: center;
+  }
+
+  .bulk-variant-selector__inventory-info small {
+    font-size: 0.75rem;
+  }
+
+  .bulk-variant-selector__summary {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: rgba(var(--text-color), 0.03);
+    border-radius: var(--border-radius);
+    border: 1px solid rgb(var(--border-color));
+  }
+
+  .bulk-variant-selector__total {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .bulk-variant-selector__total-label {
+    font-size: 0.875rem;
+  }
+
+  .bulk-variant-selector__total-count,
+  .bulk-variant-selector__total-price,
+  .bulk-variant-selector__total-savings {
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  .bulk-variant-selector__total-savings {
+    color: rgb(5, 150, 105);
+  }
+
+  .bulk-variant-selector__properties {
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    background-color: rgba(var(--text-color), 0.03);
+    border-radius: var(--border-radius);
+    border: 1px solid rgb(var(--border-color));
+  }
+
+  .bulk-variant-selector__properties-header {
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+
+  .bulk-variant-selector__properties-title {
+    margin: 0 0 0.25rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .bulk-variant-selector__properties-description {
+    margin: 0;
+    font-size: 0.875rem;
+  }
+
+  .bulk-variant-selector__properties-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .bulk-variant-selector__property-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .bulk-variant-selector__property-label {
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  .bulk-variant-selector__property-input,
+  .bulk-variant-selector__property-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid rgb(var(--border-color));
+    border-radius: var(--border-radius);
+    background-color: rgb(var(--background));
+    color: rgb(var(--text-color));
+    font-size: 0.875rem;
+    font-family: inherit;
+  }
+
+  .bulk-variant-selector__property-input:focus,
+  .bulk-variant-selector__property-textarea:focus {
+    outline: none;
+    border-color: rgb(var(--text-color));
+    box-shadow: 0 0 0 1px rgb(var(--text-color));
+  }
+
+  .bulk-variant-selector__property-textarea {
+    resize: vertical;
+    min-height: 80px;
+  }
+
+  .bulk-variant-selector__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .bulk-variant-selector__add-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Hide bulk selector by default (show regular form) */
+  .bulk-variant-selector {
+    display: none;
+  }
+
+  /* Show bulk selector when bulk mode is active */
+  .product-form--bulk-mode .bulk-variant-selector {
+    display: block;
+  }
+
+  /* Hide standard variant picker and buy buttons when bulk mode is active */
+  .product-form--bulk-mode .product-form__variants,
+  .product-form--bulk-mode .product-form__quantity,
+  .product-form--bulk-mode .product-form__buy-buttons {
+    display: none !important;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .bulk-variant-selector {
+      padding: 1rem;
+    }
+
+    .bulk-variant-selector__table {
+      font-size: 0.8rem;
+    }
+
+    .bulk-variant-selector__header-cell,
+    .bulk-variant-selector__cell {
+      padding: 0.5rem 0.25rem;
+    }
+
+    .bulk-variant-selector__summary {
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .bulk-variant-selector__actions {
+      grid-template-columns: 1fr;
+    }
+  }
+  </style>
+
+  <script>
+  (function() {
+    if (typeof window.BulkVariantSelectorInitialized !== 'undefined') return;
+    window.BulkVariantSelectorInitialized = true;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const bulkSelectors = document.querySelectorAll('[data-bulk-variant-selector]');
+
+      bulkSelectors.forEach(bulkSelector => {
+        initBulkVariantSelector(bulkSelector);
+      });
+    });
+
+    function initBulkVariantSelector(bulkSelector) {
+      const quantityInputs = bulkSelector.querySelectorAll('[data-variant-quantity]');
+      const totalCountElement = bulkSelector.querySelector('[data-bulk-total-count]');
+      const totalPriceElement = bulkSelector.querySelector('[data-bulk-total-price]');
+      const totalSavingsElement = bulkSelector.querySelector('[data-bulk-total-savings]');
+      const savingsContainer = bulkSelector.querySelector('.bulk-variant-selector__savings');
+      const addAllBtn = bulkSelector.querySelector('[data-bulk-add-all-btn]');
+      const clearBtn = bulkSelector.querySelector('[data-bulk-clear-btn]');
+      const filterSelects = bulkSelector.querySelectorAll('[data-bulk-filter]');
+      const variantRows = bulkSelector.querySelectorAll('.bulk-variant-selector__row');
+
+      // Add event listeners
+      quantityInputs.forEach(input => {
+        input.addEventListener('input', updateTotals);
+        input.addEventListener('change', updateTotals);
+      });
+
+      if (addAllBtn) {
+        addAllBtn.addEventListener('click', addAllToCart);
+      }
+
+      if (clearBtn) {
+        clearBtn.addEventListener('click', clearAllQuantities);
+      }
+
+      // Filter event listeners
+      filterSelects.forEach(filterSelect => {
+        filterSelect.addEventListener('change', applyFilters);
+      });
+
+      // Initial update
+      updateTotals();
+
+      function applyFilters() {
+        const filters = {};
+
+        // Collect all active filters
+        filterSelects.forEach(select => {
+          const optionIndex = select.getAttribute('data-bulk-filter');
+          const value = select.value;
+          if (value) {
+            filters[optionIndex] = value;
+          }
+        });
+
+        // Show/hide rows based on filters
+        variantRows.forEach(row => {
+          let shouldShow = true;
+
+          // Check each filter
+          Object.keys(filters).forEach(optionIndex => {
+            const rowOptionValue = row.getAttribute(`data-option${optionIndex}`);
+            if (rowOptionValue !== filters[optionIndex]) {
+              shouldShow = false;
+            }
+          });
+
+          // Apply filter to variant row
+          if (shouldShow) {
+            row.classList.remove('bulk-variant-selector__row--filtered');
+          } else {
+            row.classList.add('bulk-variant-selector__row--filtered');
+          }
+
+          // Apply same filter to corresponding instructions row
+          const variantId = row.getAttribute('data-variant-id');
+          const instructionsRow = bulkSelector.querySelector(`.bulk-variant-selector__instructions-row[data-variant-id="${variantId}"]`);
+          if (instructionsRow) {
+            if (shouldShow) {
+              instructionsRow.classList.remove('bulk-variant-selector__instructions-row--filtered');
+            } else {
+              instructionsRow.classList.add('bulk-variant-selector__instructions-row--filtered');
+            }
+          }
+        });
+
+        // Recalculate totals after filtering
+        updateTotals();
+      }
+
+      // No need to detect line item properties - they're hardcoded in the HTML now
+
+      function updateTotals() {
+        let totalCount = 0;
+        let totalPrice = 0;
+        let totalComparePrice = 0;
+
+        quantityInputs.forEach(input => {
+          const quantity = parseInt(input.value) || 0;
+          if (quantity > 0) {
+            const variantId = input.getAttribute('data-variant-quantity');
+            const variantRow = bulkSelector.querySelector(`[data-variant-id="${variantId}"]`);
+
+            if (variantRow) {
+              const price = parseInt(variantRow.getAttribute('data-variant-price'));
+              const comparePrice = parseInt(variantRow.getAttribute('data-variant-compare-price'));
+
+              totalCount += quantity;
+              totalPrice += price * quantity;
+              totalComparePrice += comparePrice * quantity;
+            }
+          }
+        });
+
+        // Update display
+        if (totalCountElement) {
+          totalCountElement.textContent = totalCount;
+        }
+
+        if (totalPriceElement) {
+          totalPriceElement.textContent = formatMoney(totalPrice);
+        }
+
+        // Show savings if applicable
+        if (totalComparePrice > totalPrice && totalCount > 0) {
+          const totalSavings = totalComparePrice - totalPrice;
+          if (totalSavingsElement) {
+            totalSavingsElement.textContent = formatMoney(totalSavings);
+          }
+          if (savingsContainer) {
+            savingsContainer.style.display = 'flex';
+          }
+        } else {
+          if (savingsContainer) {
+            savingsContainer.style.display = 'none';
+          }
+        }
+
+        // Enable/disable add all button
+        if (addAllBtn) {
+          addAllBtn.disabled = totalCount === 0;
+        }
+      }
+
+      function clearAllQuantities() {
+        quantityInputs.forEach(input => {
+          input.value = 0;
+        });
+
+        // Clear per-variant instruction fields
+        const instructionInputs = bulkSelector.querySelectorAll('[data-variant-instructions]');
+        instructionInputs.forEach(input => {
+          input.value = '';
+        });
+
+        updateTotals();
+      }
+
+      function addAllToCart() {
+        const itemsToAdd = [];
+
+        quantityInputs.forEach(input => {
+          const quantity = parseInt(input.value) || 0;
+          if (quantity > 0) {
+            const variantId = input.getAttribute('data-variant-quantity');
+            const item = {
+              id: variantId,
+              quantity: quantity
+            };
+
+            // Get the special instructions for this specific variant
+            const instructionInput = bulkSelector.querySelector(`[data-variant-instructions="${variantId}"]`);
+            if (instructionInput && instructionInput.value.trim()) {
+              item.properties = {
+                'Special Instructions': instructionInput.value.trim()
+              };
+            }
+
+            itemsToAdd.push(item);
+          }
+        });
+
+        if (itemsToAdd.length === 0) {
+          return;
+        }
+
+        // Save original button text
+        const originalButtonText = addAllBtn ? addAllBtn.textContent : '';
+
+        // Disable button and show loading state
+        if (addAllBtn) {
+          addAllBtn.disabled = true;
+          addAllBtn.textContent = 'Adding...';
+        }
+
+        console.log('Adding items to cart:', itemsToAdd);
+
+        // Add items to cart
+        fetch('/cart/add.js', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            items: itemsToAdd
+          })
+        })
+        .then(response => {
+          console.log('Cart API response status:', response.status);
+          if (!response.ok) {
+            return response.json().then(err => {
+              throw new Error(err.description || 'Cart add failed');
+            });
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log('Successfully added to cart:', data);
+
+          // Trigger cart update events for different themes
+          document.documentElement.dispatchEvent(new CustomEvent('cart:refresh', { bubbles: true }));
+          document.dispatchEvent(new CustomEvent('cart:updated'));
+
+          // Also try triggering theme-specific events
+          if (window.theme && window.theme.cart) {
+            window.theme.cart.refresh();
+          }
+
+          // Clear quantities and special instructions after successful add to cart
+          clearAllQuantities();
+
+          // Show success message
+          showMessage('Successfully added ' + itemsToAdd.length + ' item(s) to cart!', 'success');
+        })
+        .catch(err => {
+          console.error('Error adding items to cart:', err);
+          showMessage(err.message || 'Error adding items to cart. Please try again.', 'error');
+        })
+        .finally(() => {
+          // Re-enable button and restore text
+          if (addAllBtn) {
+            addAllBtn.disabled = false;
+            addAllBtn.textContent = originalButtonText;
+          }
+        });
+      }
+
+      function formatMoney(cents) {
+        const value = Number(cents);
+        if (isNaN(value)) return '$0.00';
+
+        // Convert cents to dollars
+        const dollars = value / 100;
+
+        // Format with currency
+        if (typeof Shopify !== 'undefined' && Shopify.formatMoney) {
+          return Shopify.formatMoney(value);
+        }
+
+        // Fallback formatting
+        return '$' + dollars.toFixed(2);
+      }
+
+      function showMessage(message, type) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `bulk-message bulk-message--${type}`;
+        messageDiv.textContent = message;
+        messageDiv.style.cssText = `
+          position: fixed;
+          top: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 10000;
+          padding: 0.75rem 1.25rem;
+          border-radius: var(--border-radius, 4px);
+          font-weight: 500;
+          background-color: ${type === 'success' ? 'rgb(5, 150, 105)' : 'rgb(220, 38, 38)'};
+          color: white;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        `;
+
+        document.body.appendChild(messageDiv);
+
+        setTimeout(() => {
+          if (messageDiv.parentNode) {
+            messageDiv.parentNode.removeChild(messageDiv);
+          }
+        }, 3000);
+      }
+    }
+  })();
+  </script>
+{%- endunless -%}

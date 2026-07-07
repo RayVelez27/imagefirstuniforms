@@ -1,0 +1,40 @@
+{%- comment -%}
+  Conditional collection template:
+  - Customers tagged with "Blue Life Security" AND ("Limit" OR "Manager"+"Extended") see the bulk order collection
+  - All other customers see the standard collection page
+{%- endcomment -%}
+
+{%- assign is_bulk_order_customer = false -%}
+{%- if customer -%}
+  {%- assign has_limit = false -%}
+  {%- assign has_bls = false -%}
+  {%- assign has_manager = false -%}
+  {%- assign has_extended = false -%}
+  {%- for tag in customer.tags -%}
+    {%- assign tag_lower = tag | downcase | strip -%}
+    {%- if tag_lower == 'limit' -%}
+      {%- assign has_limit = true -%}
+    {%- endif -%}
+    {%- if tag_lower == 'blue life security' -%}
+      {%- assign has_bls = true -%}
+    {%- endif -%}
+    {%- if tag_lower == 'manager' -%}
+      {%- assign has_manager = true -%}
+    {%- endif -%}
+    {%- if tag_lower == 'extended' -%}
+      {%- assign has_extended = true -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- if has_bls and has_limit -%}
+    {%- assign is_bulk_order_customer = true -%}
+  {%- elsif has_bls and has_manager and has_extended -%}
+    {%- assign is_bulk_order_customer = true -%}
+  {%- endif -%}
+{%- endif -%}
+
+{%- if is_bulk_order_customer -%}
+  {% section 'main-collection-bulk-order' %}
+{%- else -%}
+  {% section 'collection-banner' %}
+  {% section 'main-collection' %}
+{%- endif -%}

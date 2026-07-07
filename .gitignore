@@ -1,0 +1,6 @@
+# Claude Code local working directory (not part of the Shopify theme)
+.claude/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db

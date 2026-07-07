@@ -1,0 +1,319 @@
+{%- comment -%}
+  Manager Dashboard Section
+  Only accessible to customers with "Manager" tag
+{%- endcomment -%}
+
+{% if customer and customer.tags contains 'Manager' %}
+  <section class="manager-dashboard">
+    <div class="container">
+      <div class="page-header">
+        <div class="page-header__text-wrapper text-container">
+          {%- if section.settings.show_title -%}
+            <h1 class="heading h2">{{ section.settings.dashboard_title | default: 'Manager Dashboard' }}</h1>
+          {%- endif -%}
+
+          {%- if section.settings.show_welcome_message -%}
+            <p class="dashboard-welcome">Welcome, {{ customer.first_name }}!</p>
+          {%- endif -%}
+        </div>
+      </div>
+
+      {%- comment -%} Check if manager has Extended and/or Akima tags (case-insensitive) {%- endcomment -%}
+      {%- assign has_extended_tag = false -%}
+      {%- assign has_akima_tag = false -%}
+      {%- assign customer_tags_lower = customer.tags | join: ',' | downcase -%}
+      {%- if customer_tags_lower contains 'extended' -%}
+        {%- assign has_extended_tag = true -%}
+      {%- endif -%}
+      {%- if customer_tags_lower contains 'akima' -%}
+        {%- assign has_akima_tag = true -%}
+      {%- endif -%}
+
+      {%- comment -%} Dashboard Tabs Navigation {%- endcomment -%}
+      {%- render 'manager-dashboard-tabs', is_extended_manager: has_extended_tag -%}
+
+      {%- comment -%} Dashboard Content {%- endcomment -%}
+      <div class="dashboard-content">
+        {%- comment -%} Orders Tab {%- endcomment -%}
+        <div id="tab-orders" class="dashboard-tab-content active">
+          {%- render 'manager-dashboard-orders', customer: customer, is_extended_manager: has_extended_tag -%}
+        </div>
+
+        {%- comment -%} Users Tab {%- endcomment -%}
+        <div id="tab-users" class="dashboard-tab-content">
+          {%- render 'manager-dashboard-users', customer: customer, is_extended_manager: has_extended_tag, is_akima_manager: has_akima_tag -%}
+        </div>
+
+        {%- comment -%} Settings Tab (Extended Managers Only) {%- endcomment -%}
+        {%- if has_extended_tag -%}
+        <div id="tab-settings" class="dashboard-tab-content">
+          {%- render 'manager-dashboard-settings', customer: customer -%}
+        </div>
+        {%- endif -%}
+      </div>
+    </div>
+  </section>
+
+  {%- comment -%} Dashboard Styles {%- endcomment -%}
+  <style>
+    .manager-dashboard {
+      padding: 40px 0;
+    }
+
+    .dashboard-welcome {
+      margin-top: 10px;
+      color: #666;
+      font-size: 16px;
+    }
+
+    .dashboard-tabs {
+      display: flex;
+      border-bottom: 2px solid #e5e5e5;
+      margin: 30px 0 0;
+      gap: 0;
+    }
+
+    .dashboard-tab {
+      padding: 15px 30px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 500;
+      color: #666;
+      border-bottom: 3px solid transparent;
+      transition: all 0.3s ease;
+      position: relative;
+      top: 2px;
+    }
+
+    .dashboard-tab:hover {
+      color: #333;
+      background-color: #f9f9f9;
+    }
+
+    .dashboard-tab.active {
+      color: #000;
+      border-bottom-color: #000;
+    }
+
+    .dashboard-content {
+      margin-top: 0;
+    }
+
+    .dashboard-tab-content {
+      display: none;
+      padding: 30px 0;
+      animation: fadeIn 0.3s ease-in;
+    }
+
+    .dashboard-tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .dashboard-table-wrapper {
+      overflow-x: auto;
+      margin-top: 20px;
+    }
+
+    .dashboard-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .dashboard-table th,
+    .dashboard-table td {
+      padding: 15px;
+      text-align: left;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .dashboard-table th {
+      background-color: #f8f8f8;
+      font-weight: 600;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #333;
+    }
+
+    .dashboard-table tr:hover {
+      background-color: #f9f9f9;
+    }
+
+    .dashboard-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .dashboard-loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .dashboard-error {
+      background-color: #fee;
+      border: 1px solid #fcc;
+      padding: 15px;
+      border-radius: 4px;
+      color: #c33;
+      margin: 20px 0;
+    }
+
+    .dashboard-empty {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+      font-style: italic;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: capitalize;
+    }
+
+    .status-paid {
+      background-color: #d4edda;
+      color: #155724;
+    }
+
+    .status-pending {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+
+    .status-fulfilled {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+
+    @media screen and (max-width: 768px) {
+      .dashboard-tabs {
+        flex-direction: column;
+        border-bottom: none;
+      }
+
+      .dashboard-tab {
+        border-bottom: 1px solid #e5e5e5;
+        border-left: 3px solid transparent;
+        top: 0;
+        text-align: left;
+      }
+
+      .dashboard-tab.active {
+        border-bottom-color: #e5e5e5;
+        border-left-color: #000;
+      }
+
+      .dashboard-table {
+        font-size: 14px;
+      }
+
+      .dashboard-table th,
+      .dashboard-table td {
+        padding: 10px;
+      }
+    }
+  </style>
+
+  {%- comment -%} Dashboard JavaScript {%- endcomment -%}
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const tabs = document.querySelectorAll('.dashboard-tab');
+      const tabContents = document.querySelectorAll('.dashboard-tab-content');
+
+      tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+          const targetId = this.getAttribute('data-tab');
+
+          // Remove active class from all tabs and contents
+          tabs.forEach(t => t.classList.remove('active'));
+          tabContents.forEach(content => content.classList.remove('active'));
+
+          // Add active class to clicked tab and corresponding content
+          this.classList.add('active');
+          document.getElementById(targetId).classList.add('active');
+
+          // Store active tab in sessionStorage
+          sessionStorage.setItem('activeManagerTab', targetId);
+        });
+      });
+
+      // Restore active tab from sessionStorage
+      const activeTab = sessionStorage.getItem('activeManagerTab');
+      if (activeTab) {
+        const targetTab = document.querySelector(`[data-tab="${activeTab}"]`);
+        if (targetTab) {
+          targetTab.click();
+        }
+      }
+    });
+  </script>
+
+{% else %}
+  {%- comment -%} Access Denied Message {%- endcomment -%}
+  <section>
+    <div class="container">
+      <div class="page-header">
+        <div class="page-header__text-wrapper text-container">
+          <h1 class="heading h2">Access Denied</h1>
+        </div>
+      </div>
+
+      <div class="page-content page-content--medium rte">
+        <p>{{ section.settings.access_denied_message | default: 'This page is only accessible to managers. Please log in with a manager account.' }}</p>
+        <p><a href="{{ routes.account_login_url }}" class="button button--primary">Log In</a></p>
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Manager Dashboard",
+  "class": "shopify-section--manager-dashboard",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "show_title",
+      "label": "Show page title",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "dashboard_title",
+      "label": "Dashboard title",
+      "default": "Manager Dashboard"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_welcome_message",
+      "label": "Show welcome message",
+      "default": true
+    },
+    {
+      "type": "textarea",
+      "id": "access_denied_message",
+      "label": "Access denied message",
+      "default": "This page is only accessible to managers. Please log in with a manager account."
+    }
+  ]
+}
+{% endschema %}

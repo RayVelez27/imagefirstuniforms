@@ -1,0 +1,1757 @@
+{%- assign color_label_list = 'general.label.color' | t | replace: ', ', ',' | downcase | split: ',' -%}
+{%- assign color_white_label = 'general.label.white' | t | downcase -%}
+{%- assign size_label_list = 'general.label.size' | t | replace: ', ', ',' | downcase | split: ',' -%}
+
+{%- comment -%}
+  Detect product limit groups - tags that start with "Limit "
+  Products with the same limit group tag are mutually exclusive in cart
+{%- endcomment -%}
+{%- assign product_limit_groups = '' -%}
+{%- for tag in product.tags -%}
+  {%- assign tag_lower = tag | downcase -%}
+  {%- if tag_lower contains 'limit ' -%}
+    {%- if product_limit_groups == '' -%}
+      {%- assign product_limit_groups = tag -%}
+    {%- else -%}
+      {%- assign product_limit_groups = product_limit_groups | append: ',' | append: tag -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{%- comment -%}Check if customer has Limit tag - hide Bulk Order option{%- endcomment -%}
+{%- assign is_limited_customer = false -%}
+{%- assign is_bulk_order_customer = false -%}
+{%- assign is_akima_company_customer = false -%}
+{%- assign is_manager_extended = false -%}
+{%- if customer -%}
+  {%- assign has_limit_tag = false -%}
+  {%- assign has_bls_tag = false -%}
+  {%- assign has_akima_tag = false -%}
+  {%- assign has_akima_company_tag = false -%}
+  {%- assign has_manager_tag = false -%}
+  {%- assign has_extended_tag = false -%}
+  {%- for tag in customer.tags -%}
+    {%- assign tag_lower = tag | downcase | strip -%}
+    {%- if tag_lower == 'limit' -%}
+      {%- assign has_limit_tag = true -%}
+    {%- endif -%}
+    {%- if tag_lower == 'blue life security' -%}
+      {%- assign has_bls_tag = true -%}
+    {%- endif -%}
+    {%- if tag_lower == 'akima' -%}
+      {%- assign has_akima_tag = true -%}
+    {%- endif -%}
+    {%- assign tag_prefix = tag_lower | slice: 0, 6 -%}
+    {%- if tag_prefix == 'akima ' -%}
+      {%- assign has_akima_company_tag = true -%}
+    {%- endif -%}
+    {%- if tag_lower == 'manager' -%}
+      {%- assign has_manager_tag = true -%}
+    {%- endif -%}
+    {%- if tag_lower == 'extended' -%}
+      {%- assign has_extended_tag = true -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- if has_limit_tag -%}
+    {%- assign is_limited_customer = true -%}
+  {%- endif -%}
+  {%- if has_limit_tag and has_bls_tag -%}
+    {%- assign is_bulk_order_customer = true -%}
+  {%- endif -%}
+  {%- if has_akima_tag and has_limit_tag and has_akima_company_tag -%}
+    {%- assign is_akima_company_customer = true -%}
+  {%- endif -%}
+  {%- if has_manager_tag and has_extended_tag -%}
+    {%- assign is_manager_extended = true -%}
+  {%- endif -%}
+{%- endif -%}
+
+{%- comment -%}Apply add-to-cart limits only for Limit customers who are NOT bulk order or Akima company customers{%- endcomment -%}
+{%- assign apply_add_to_cart_limits = false -%}
+{%- if is_limited_customer and is_bulk_order_customer == false and is_akima_company_customer == false -%}
+  {%- assign apply_add_to_cart_limits = true -%}
+{%- endif -%}
+
+{%- comment -%}Size Charts - detect product tags once, render below quantity selector{%- endcomment -%}
+{%- assign size_chart_type = nil -%}
+{%- for tag in product.tags -%}
+  {%- if tag == 'Size Chart Belt' -%}
+    {%- assign size_chart_type = 'belt' -%}
+  {%- endif -%}
+  {%- if tag == 'Size Chart Shirt' -%}
+    {%- assign size_chart_type = 'shirt' -%}
+  {%- endif -%}
+  {%- if tag == 'Size Chart Pants' -%}
+    {%- assign size_chart_type = 'pants' -%}
+  {%- endif -%}
+{%- endfor -%}
+
+<div class="product-form" data-limit-groups="{{ product_limit_groups | escape }}" data-product-title="{{ product.title | escape }}"{% if apply_add_to_cart_limits %} data-limited-customer="true"{% endif %}>
+  {%- comment -%}Order Mode Toggle - Hidden for Limit customers (they can only use Regular Order){%- endcomment -%}
+  {%- unless product.has_only_default_variant -%}
+    {%- unless is_limited_customer -%}
+    <div class="product-form__order-mode-toggle" data-order-mode-toggle>
+      <div class="order-mode-toggle">
+        <button type="button" class="order-mode-toggle__option order-mode-toggle__option--active" data-mode="regular">
+          Regular Order
+        </button>
+        <button type="button" class="order-mode-toggle__option" data-mode="bulk">
+          Bulk Order
+        </button>
+      </div>
+    </div>
+    {%- endunless -%}
+
+    <style>
+      .product-form__order-mode-toggle {
+        margin-bottom: 1.5rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid rgb(var(--border-color));
+      }
+
+      .order-mode-toggle {
+        display: inline-flex;
+        background-color: rgba(var(--text-color), 0.05);
+        border-radius: var(--border-radius);
+        padding: 0.25rem;
+        gap: 0.25rem;
+      }
+
+      .order-mode-toggle__option {
+        padding: 0.625rem 1.25rem;
+        border: none;
+        background: transparent;
+        color: rgb(var(--text-color));
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-radius: calc(var(--border-radius) - 2px);
+        white-space: nowrap;
+      }
+
+      .order-mode-toggle__option:hover {
+        background-color: rgba(var(--text-color), 0.08);
+      }
+
+      .order-mode-toggle__option--active {
+        background-color: rgb(var(--background));
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        color: rgb(var(--text-color));
+      }
+
+      @media (max-width: 768px) {
+        .product-form__order-mode-toggle {
+          text-align: center;
+        }
+
+        .order-mode-toggle {
+          width: 100%;
+        }
+
+        .order-mode-toggle__option {
+          flex: 1;
+          font-size: 0.8125rem;
+          padding: 0.5rem 0.75rem;
+        }
+      }
+    </style>
+
+    <script>
+      (function() {
+        if (typeof window.OrderModeToggleInitialized !== 'undefined') return;
+        window.OrderModeToggleInitialized = true;
+
+        document.addEventListener('DOMContentLoaded', function() {
+          const toggleContainer = document.querySelector('[data-order-mode-toggle]');
+          if (!toggleContainer) return;
+
+          const productForm = toggleContainer.closest('.product-form');
+          if (!productForm) return;
+
+          const toggleButtons = toggleContainer.querySelectorAll('[data-mode]');
+
+          // Load saved preference from sessionStorage
+          const savedMode = sessionStorage.getItem('orderMode') || 'regular';
+          setMode(savedMode);
+
+          // Add click handlers
+          toggleButtons.forEach(button => {
+            button.addEventListener('click', function() {
+              const mode = this.getAttribute('data-mode');
+              setMode(mode);
+              sessionStorage.setItem('orderMode', mode);
+            });
+          });
+
+          function setMode(mode) {
+            // Update button states
+            toggleButtons.forEach(btn => {
+              if (btn.getAttribute('data-mode') === mode) {
+                btn.classList.add('order-mode-toggle__option--active');
+              } else {
+                btn.classList.remove('order-mode-toggle__option--active');
+              }
+            });
+
+            // Update product form class
+            if (mode === 'bulk') {
+              productForm.classList.add('product-form--bulk-mode');
+            } else {
+              productForm.classList.remove('product-form--bulk-mode');
+            }
+          }
+        });
+      })();
+    </script>
+  {%- endunless -%}
+
+  {%- comment -%}Bulk variant selector - hidden by default{%- endcomment -%}
+  {%- render 'bulk-variant-selector', product: product, product_form_id: product_form_id -%}
+
+  {%- for block in section.blocks -%}
+    {%- case block.type -%}
+      {%- comment -%}
+      ----------------------------------------------------------------------------------------------------------------
+      APP BLOCK TYPE
+      ----------------------------------------------------------------------------------------------------------------
+      {%- endcomment -%}
+      {%- when '@app' -%}
+        {%- render block -%}
+
+      {%- comment -%}
+      ----------------------------------------------------------------------------------------------------------------
+      VARIANT PICKER BLOCK TYPE
+      ----------------------------------------------------------------------------------------------------------------
+      {%- endcomment -%}
+      {%- when 'variant_picker' -%}
+        {%- unless product.has_only_default_variant -%}
+          {%- assign size_chart_page = block.settings.size_chart_page -%}
+          {%- assign found_size_option = false -%}
+
+          <variant-picker data-block-type="variant-picker" data-block-id="{{ section.id }}" handle="{{ product.handle }}" section-id="{{ section.id }}" form-id="{{ product_form_id }}" {% if update_url %}update-url{% endif %} {% if block.settings.hide_sold_out_variants %}hide-sold-out-variants{% endif %} class="product-form__variants" {{ block.shopify_attributes }}>
+            {%- comment -%}
+            The variant data is outputted as a JSON, which allows the theme to emit an event with the data when the variant changes. This must not be removed.
+            {%- endcomment -%}
+            <script data-variant type="application/json">
+              {{- product.selected_or_first_available_variant | json -}}
+            </script>
+
+            {%- for option in product.options_with_values -%}
+              {%- assign option_downcase = option.name | downcase -%}
+              {%- capture option_id -%}option-{{ section.id }}-{{ template.suffix }}-{{ product.id }}-{{ forloop.index }}-{{ context }}{%- endcapture -%}
+
+              {%- assign selector_type = block.settings.selector_mode -%}
+              {%- assign variant_image_options = block.settings.variant_image_options | replace: ', ', ',' | downcase | split: ',' -%}
+
+              {%- assign swatch_count = option.values | map: 'swatch' | compact | size -%}
+
+              {%- if swatch_count > 0 and block.settings.color_mode == 'swatch' %}
+                {%- assign selector_type = 'swatch' -%}
+              {%- endif -%}
+
+              {% if swatch_count == 0 and color_label_list contains option_downcase and block.settings.color_mode != 'none' %}
+                {%- assign selector_type = 'swatch' -%}
+              {%- endif -%}
+
+              {%- if variant_image_options contains option_downcase -%}
+                {%- assign selector_type = 'variant_image' -%}
+              {%- endif -%}
+
+              <div class="product-form__option-selector" data-selector-type="{{ selector_type | replace: '_', '-' | escape }}">
+                <div class="product-form__option-info">
+                  <span class="product-form__option-name">{{ option.name }}:</span>
+
+                  {%- if selector_type != 'dropdown' -%}
+                    <span id="{{ option_id }}-value" class="product-form__option-value">{{ option.selected_value }}</span>
+                  {%- endif -%}
+
+                  {%- if size_chart_page != blank and size_label_list contains option_downcase -%}
+                    {%- assign found_size_option = true -%}
+                    <button type="button" is="toggle-button" class="product-form__option-link link text--subdued hidden-phone" aria-controls="product-{{ section.id }}-{{ product.id }}-size-chart-drawer" aria-expanded="false">{{ 'product.general.size_chart' | t }}</button>
+                    <button type="button" is="toggle-button" class="product-form__option-link link text--subdued hidden-tablet-and-up" aria-controls="product-{{ section.id }}-{{ product.id }}-size-chart-popover" aria-expanded="false">{{ 'product.general.size_chart' | t }}</button>
+                  {%- endif -%}
+                </div>
+
+                {%- case selector_type -%}
+                  {%- when 'variant_image' -%}
+                    <div class="variant-swatch-list">
+                      {%- for value in option.values -%}
+                        {%- assign image = value.variant.featured_media | default: value.variant.product.featured_media | default: product.featured_media -%}
+
+                        <div class="variant-swatch {% unless value.available %}is-disabled{% endunless %}">
+                          {%- if value.product_url != blank -%}
+                            {%- if value == option.selected_value -%}
+                              <input type="hidden" form="{{ product_form_id }}" data-option-position="{{ option.position }}" name="option{{ option.position }}" value="{{ value.id }}">
+                            {%- endif -%}
+
+                            <a href="{{ value.product_url }}" class="variant-swatch__item {% if value == option.selected_value %}is-selected{% endif %}">
+                              <span class="visually-hidden">{{ value }}</span>
+
+                              {{- image | image_url: width: image.width | image_tag: loading: 'lazy', sizes: '(max-width: 740px) 64px, 72px', sizes: '64,72,128,144,192,216', class: 'variant-swatch__image' -}}
+                            </a>
+                          {%- else -%}
+                            <input class="variant-swatch__radio visually-hidden" type="radio" data-option-position="{{ option.position }}" name="option{{ option.position }}" form="{{ product_form_id }}" id="{{ option_id }}-{{ forloop.index }}" value="{{ value.id }}" {% if value == option.selected_value %}checked="checked"{% endif %} aria-label="{{ value | escape }}">
+                            <label class="variant-swatch__item" for="{{ option_id }}-{{ forloop.index }}">
+                              <span class="visually-hidden">{{ value }}</span>
+
+                              {{- image | image_url: width: image.width | image_tag: loading: 'lazy', sizes: '(max-width: 740px) 64px, 72px', sizes: '64,72,128,144,192,216', class: 'variant-swatch__image' -}}
+                            </label>
+                          {%- endif -%}
+                        </div>
+                      {%- endfor -%}
+                    </div>
+
+                  {%- when 'swatch' -%}
+                    <div class="color-swatch-list">
+                      {%- assign color_swatch_config = settings.color_swatch_config | newline_to_br | split: '<br />' -%}
+
+                      {%- for value in option.values -%}
+                        {%- assign color_value_downcase = value | downcase -%}
+
+                        <div class="color-swatch {% if color_white_label == color_value_downcase %}color-swatch--white{% endif %} {% unless value.available %}is-disabled{% endunless %}">
+                          {%- if value.product_url != blank -%}
+                            {%- if value == option.selected_value -%}
+                              <input type="hidden" form="{{ product_form_id }}" data-option-position="{{ option.position }}" name="option{{ option.position }}" value="{{ value.id }}">
+                            {%- endif -%}
+
+                            <a href="{{ value.product_url }}" class="color-swatch__item {% if value == option.selected_value %}is-selected{% endif %}" style="{% render 'color-swatch-style', swatch: value.swatch, color_swatch_config: color_swatch_config, value: value %}">
+                              <span class="visually-hidden">{{ value }}</span>
+                            </a>
+                          {%- else -%}
+                            <input class="color-swatch__radio visually-hidden" type="radio" data-option-position="{{ option.position }}" name="option{{ option.position }}" form="{{ product_form_id }}" id="{{ option_id }}-{{ forloop.index }}" value="{{ value.id }}" {% if value == option.selected_value %}checked="checked"{% endif %}>
+                            <label class="color-swatch__item" for="{{ option_id }}-{{ forloop.index }}" style="{% render 'color-swatch-style', swatch: value.swatch, color_swatch_config: color_swatch_config, value: value %}">
+                              <span class="visually-hidden">{{ value }}</span>
+                            </label>
+                          {%- endif -%}
+                        </div>
+                      {%- endfor -%}
+                    </div>
+
+                  {%- when 'block' -%}
+                    <div class="block-swatch-list">
+                      {%- for value in option.values -%}
+                        <div class="block-swatch {% unless value.available %}is-disabled{% endunless %}">
+                          {%- if value.product_url != blank -%}
+                            {%- if value == option.selected_value -%}
+                              <input type="hidden" form="{{ product_form_id }}" data-option-position="{{ option.position }}" name="option{{ option.position }}" value="{{ value.id }}">
+                            {%- endif -%}
+
+                            <a href="{{ value.product_url }}" class="block-swatch__item {% if value == option.selected_value %}is-selected{% endif %}">
+                              {{- value -}}
+                            </a>
+                          {%- else -%}
+                            <input class="block-swatch__radio visually-hidden" type="radio" data-option-position="{{ option.position }}" name="option{{ option.position }}" form="{{ product_form_id }}" id="{{ option_id }}-{{ forloop.index }}" value="{{ value.id }}" {% if value == option.selected_value %}checked="checked"{% endif %}>
+                            <label class="block-swatch__item" for="{{ option_id }}-{{ forloop.index }}">{{ value }}</label>
+                          {%- endif -%}
+                        </div>
+                      {%- endfor -%}
+                    </div>
+
+                  {%- when 'dropdown' -%}
+                    <div class="select-wrapper">
+                      <combo-box initial-focus-selector="[aria-selected='true']" id="{{ option_id }}-combo-box" class="combo-box">
+                        <span class="combo-box__overlay"></span>
+
+                        <header class="combo-box__header">
+                          <p class="combo-box__title heading h6">{{ option.name }}</p>
+
+                          <button type="button" class="combo-box__close-button tap-area" data-action="close" title="{{ 'general.accessibility.close' | t | escape }}">
+                            {%- render 'icon' with 'close' -%}
+                          </button>
+                        </header>
+
+                        <div class="combo-box__option-list" role="listbox">
+                          {%- for value in option.values -%}
+                            {%- if value.product_url != blank -%}
+                              {%- if value == option.selected_value -%}
+                                <input type="hidden" form="{{ product_form_id }}" data-option-position="{{ option.position }}" name="option{{ option.position }}" value="{{ value.id }}">
+                              {%- endif -%}
+
+                              <a href="{{ value.product_url }}" aria-selected="{% if value == option.selected_value %}true{% else %}false{% endif %}" class="combo-box__option-item {% if value.available == false %}is-disabled{% endif %}">
+                                {{- value -}}
+                              </a>
+                            {%- else -%}
+                              <button type="button" role="option" class="combo-box__option-item {% if value.available == false %}is-disabled{% endif %}" value="{{ value.id }}" aria-selected="{% if value == option.selected_value %}true{% else %}false{% endif %}">{{ value }}</button>
+                            {%- endif -%}
+                          {%- endfor -%}
+                        </div>
+
+                        <input type="hidden" data-option-position="{{ option.position }}" name="option{{ option.position }}" form="{{ product_form_id }}" value="{{ option.selected_value.id }}" aria-label="{{ option.name | escape }}">
+                      </combo-box>
+
+                      <button type="button" is="toggle-button" class="select" aria-expanded="false" aria-haspopup="listbox" aria-controls="{{ option_id }}-combo-box">
+                        <span id="{{ option_id }}-value" class="select__selected-value">{{ option.selected_value }}</span>
+                        {%- render 'icon' with 'chevron' -%}
+                      </button>
+                    </div>
+                {%- endcase -%}
+              </div>
+            {%- endfor -%}
+
+            <noscript>
+              <label class="input__block-label" for="product-select-{{ section.id }}-{{ product.id }}">{{ 'product.form.variant' | t }}</label>
+
+              <div class="select-wrapper">
+                <select class="select" autocomplete="off" id="product-select-{{ section.id }}-{{ product.id }}" name="id" form="{{ product_form_id }}">
+                  {%- for variant in product.variants -%}
+                    <option {% if variant == product.selected_or_first_available_variant %}selected="selected"{% endif %} {% unless variant.available %}disabled="disabled"{% endunless %} value="{{ variant.id }}" data-sku="{{ variant.sku }}">{{ variant.title }} - {{ variant.price | money }}</option>
+                  {%- endfor -%}
+                </select>
+
+                {%- render 'icon' with 'chevron' -%}
+              </div>
+            </noscript>
+          </variant-picker>
+        {%- endunless -%}
+
+      {%- comment -%}
+      ----------------------------------------------------------------------------------------------------------------
+      LINE ITEM PROPERTY
+      ----------------------------------------------------------------------------------------------------------------
+      {%- endcomment -%}
+      {%- when 'line_item_property' -%}
+        {%- if block.settings.label != blank -%}
+          {%- case block.settings.type -%}
+            {%- when 'text' -%}
+              {%- if block.settings.allow_long_text -%}
+                <div class="product-form__line-item-property" {{ block.shopify_attributes }} data-line-item-property>
+                  <label class="input__block-label" for="line-item-{{ section.id }}-{{ block.id }}">{{ block.settings.label | escape }}:</label>
+                  <textarea {% if block.settings.required %}required{% endif %} id="line-item-{{ section.id }}-{{ block.id }}" form="{{ product_form_id }}" class="input__field input__field--textarea" name="properties[{{ block.settings.label | escape }}]"></textarea>
+                </div>
+              {% else %}
+                <div class="product-form__line-item-property" {{ block.shopify_attributes }} data-line-item-property>
+                  <label class="input__block-label" for="line-item-{{ section.id }}-{{ block.id }}">{{ block.settings.label | escape }}:</label>
+                  <input {% if block.settings.required %}required{% endif %} id="line-item-{{ section.id }}-{{ block.id }}" form="{{ product_form_id }}" type="text" class="input__field" name="properties[{{ block.settings.label | escape }}]">
+                </div>
+              {%- endif -%}
+
+            {%- when 'checkbox' -%}
+              <div class="product-form__line-item-property" {{ block.shopify_attributes }} data-line-item-property>
+                <div class="checkbox-container">
+                  <input type="hidden" form="{{ product_form_id }}" class="checkbox" name="properties[{{ block.settings.label | escape }}]" value="{{ block.settings.unchecked_value | escape }}">
+                  <input type="checkbox" form="{{ product_form_id }}" class="checkbox" name="properties[{{ block.settings.label | escape }}]" id="line-item-{{ section.id }}-{{ block.id }}" value="{{ block.settings.checked_value | escape }}">
+                  <label for="line-item-{{ section.id }}-{{ block.id }}">{{ block.settings.label | escape }}</label>
+                </div>
+              </div>
+          {%- endcase -%}
+        {%- endif -%}
+
+      {%- comment -%}
+      ----------------------------------------------------------------------------------------------------------------
+      TEXT
+      ----------------------------------------------------------------------------------------------------------------
+      {%- endcomment -%}
+      {%- when 'text' -%}
+        {% if block.settings.text != blank %}
+          <div class="product-form__text" {{ block.shopify_attributes }}>
+            {{- block.settings.text -}}
+          </div>
+        {%- endif -%}
+
+      {%- comment -%}
+      ----------------------------------------------------------------------------------------------------------------
+      IMAGE
+      ----------------------------------------------------------------------------------------------------------------
+      {%- endcomment -%}
+      {%- when 'image' -%}
+        {% if block.settings.image != blank and context != 'quick-buy' %}
+          <div class="product-form__image product-form__image--{{ block.settings.image_alignment }}" {{ block.shopify_attributes }}>
+            {%- capture image_sizes -%}{{ block.settings.image_width }}, {{ block.settings.image_width | times: 2 }}, {{ block.settings.image_width | times: 3 }}{%- endcapture -%}
+            {%- capture sizes_attribute -%}{{ block.settings.image_width }}px{%- endcapture -%}
+            {%- capture style_attribute -%}max-width: {{ block.settings.image_width }}px{%- endcapture -%}
+            {{- block.settings.image | image_url: width: block.settings.image.width | image_tag: loading: 'lazy', sizes: sizes_attribute, widths: image_sizes, style: style_attribute -}}
+          </div>
+        {%- endif -%}
+
+      {%- comment -%}
+      ----------------------------------------------------------------------------------------------------------------
+      BUTTON
+      ----------------------------------------------------------------------------------------------------------------
+      {%- endcomment -%}
+      {%- when 'button' -%}
+        {% if block.settings.link != blank and block.settings.text != blank and context != 'quick-buy' %}
+          <div class="product-form__button" {{ block.shopify_attributes }}>
+            {%- if block.settings.background == 'rgba(0,0,0,0)' -%}
+              {%- assign button_background = settings.primary_button_background -%}
+            {%- else -%}
+              {%- assign button_background = block.settings.background -%}
+            {%- endif -%}
+
+            {%- if block.settings.text_color == 'rgba(0,0,0,0)' -%}
+              {%- assign button_text_color = settings.primary_button_text_color -%}
+            {%- else -%}
+              {%- assign button_text_color = block.settings.text_color -%}
+            {%- endif -%}
+
+            {%- capture button_background_rgb -%}{{ button_background.red }}, {{ button_background.green }}, {{ button_background.blue }}{%- endcapture -%}
+            {%- capture button_text_color_rgb -%}{{ button_text_color.red }}, {{ button_text_color.green }}, {{ button_text_color.blue }}{%- endcapture -%}
+
+            <a href="{{ block.settings.link }}" class="button button--primary {% if block.settings.stretch %}button--full{% endif %}" style="--primary-button-background: {{ button_background_rgb }}; --primary-button-text-color: {{ button_text_color_rgb }}">{{ block.settings.text | escape }}</a>
+          </div>
+        {%- endif -%}
+
+      {%- comment -%}
+      ----------------------------------------------------------------------------------------------------------------
+      CUSTOM LIQUID
+      ----------------------------------------------------------------------------------------------------------------
+      {%- endcomment -%}
+      {%- when 'liquid' -%}
+        <div data-block-type="liquid" data-block-id="{{ block.id }}" {{ block.shopify_attributes }}>
+          {% if block.settings.liquid != blank %}
+            <div class="product-form__custom-liquid">
+              {{- block.settings.liquid -}}
+            </div>
+          {%- endif -%}
+        </div>
+
+      {%- comment -%}
+      ----------------------------------------------------------------------------------------------------------------
+      QUANTITY SELECTOR
+      ----------------------------------------------------------------------------------------------------------------
+      {%- endcomment -%}
+      {%- when 'quantity_selector' -%}
+        {%- if request.page_type != 'password' and product.available -%}
+          {%- comment -%}Check if customer has Limit tag for quantity restriction{%- endcomment -%}
+          {%- assign is_limited_customer = false -%}
+          {%- if customer -%}
+            {%- assign customer_tags_lower = customer.tags | join: ',' | downcase -%}
+            {%- if customer_tags_lower contains 'limit' -%}
+              {%- assign is_limited_customer = true -%}
+            {%- endif -%}
+          {%- endif -%}
+
+          {%- comment -%}Check if product has "Limit Shirts" tag for pants quantity dropdown{%- endcomment -%}
+          {%- assign is_limit_shirts_product = false -%}
+          {%- assign product_tags_lower = product.tags | join: ',' | downcase -%}
+          {%- if product_tags_lower contains 'limit shirts' -%}
+            {%- assign is_limit_shirts_product = true -%}
+          {%- endif -%}
+
+          {%- comment -%}Check if product has "Limit Pants" tag for special instructions placeholder{%- endcomment -%}
+          {%- assign is_limit_pants_product = false -%}
+          {%- if product_tags_lower contains 'limit pants' -%}
+            {%- assign is_limit_pants_product = true -%}
+          {%- endif -%}
+
+          <div data-block-type="quantity-selector" data-block-id="{{ block.id }}" class="product-form__quantity{% if apply_add_to_cart_limits %} product-form__quantity--limited{% endif %}" {{ block.shopify_attributes }}>
+            <span class="product-form__quantity-label">{{ 'product.form.quantity' | t }}:</span>
+
+            {%- if apply_add_to_cart_limits and is_limit_shirts_product -%}
+              {%- comment -%}Special quantity dropdown for Limit customers on Limit Shirts products{%- endcomment -%}
+              <div class="quantity-selector quantity-selector--shirts-dropdown">
+                <select form="{{ product_form_id }}" name="quantity" class="quantity-selector__select" aria-label="{{ 'product.form.quantity' | t | escape }}">
+                  <option value="0" selected>0 Shirts (by default)</option>
+                  <option value="1">1 Shirt</option>
+                  <option value="2">2 Shirts</option>
+                  <option value="3">3 Shirts</option>
+                  <option value="4">4 Shirts</option>
+                </select>
+              </div>
+            {%- elsif apply_add_to_cart_limits and is_limit_pants_product -%}
+              {%- comment -%}Special quantity dropdown for Limit customers on Limit Pants products{%- endcomment -%}
+              <div class="quantity-selector quantity-selector--pants-dropdown">
+                <select form="{{ product_form_id }}" name="quantity" class="quantity-selector__select" aria-label="{{ 'product.form.quantity' | t | escape }}">
+                  <option value="0" selected>0 Pants (by default)</option>
+                  <option value="1">1 Pants</option>
+                  <option value="2">2 Pants</option>
+                  <option value="3">3 Pants</option>
+                </select>
+              </div>
+            {%- else -%}
+            <quantity-selector class="quantity-selector{% if apply_add_to_cart_limits %} quantity-selector--limited{% endif %}">
+              {%- unless apply_add_to_cart_limits -%}
+              <button type="button" class="quantity-selector__button">
+                <span class="visually-hidden">{{ 'cart.general.decrease_quantity' | t }}</span>
+                {%- render 'icon' with 'minus-big' -%}
+              </button>
+              {%- endunless -%}
+
+              <input type="number" form="{{ product_form_id }}" is="input-number" class="quantity-selector__input" inputmode="numeric" name="quantity" autocomplete="off" value="1" {% if apply_add_to_cart_limits %}step="1" min="1" max="1" readonly{% else %}step="{{ product.selected_or_first_available_variant.quantity_rule.increment }}" min="{{ product.selected_or_first_available_variant.quantity_rule.min }}" {% if product.selected_or_first_available_variant.quantity_rule.max != nil %}max="{{ product.selected_or_first_available_variant.quantity_rule.max }}"{% endif %}{% endif %} aria-label="{{ 'product.form.quantity' | t | escape }}">
+
+              {%- unless apply_add_to_cart_limits -%}
+              <button type="button" class="quantity-selector__button">
+                <span class="visually-hidden">{{ 'cart.general.increase_quantity' | t }}</span>
+                {%- render 'icon' with 'plus-big' -%}
+              </button>
+              {%- endunless -%}
+            </quantity-selector>
+            {%- endif -%}
+
+            {%- if apply_add_to_cart_limits and is_limit_shirts_product -%}
+              <p class="product-form__quantity-rules text--subdued text--small">Select shirts quantity</p>
+            {%- elsif apply_add_to_cart_limits and is_limit_pants_product -%}
+              <p class="product-form__quantity-rules text--subdued text--small">Select pants quantity</p>
+            {%- elsif apply_add_to_cart_limits -%}
+              <p class="product-form__quantity-rules text--subdued text--small">Limited to 1 per item</p>
+            {%- else -%}
+              {%- liquid
+                assign variant = product.selected_or_first_available_variant
+                assign quantity_rules = ''
+
+                if variant.quantity_rule.min > 1
+                  assign rule = 'product.quantity.minimum_of' | t: min: variant.quantity_rule.min
+                  assign quantity_rules = quantity_rules | append: ' / ' | append: rule
+                endif
+
+                if variant.quantity_rule.max != nil
+                  assign rule = 'product.quantity.maximum_of' | t: max: variant.quantity_rule.max
+                  assign quantity_rules = quantity_rules | append: ' / ' | append: rule
+                endif
+
+                if variant.quantity_rule.increment > 1
+                  assign rule = 'product.quantity.increment_of' | t: step: variant.quantity_rule.increment
+                  assign quantity_rules = quantity_rules | append: ' / ' | append: rule
+                endif
+              -%}
+
+              {%- if quantity_rules != blank -%}
+                <p class="product-form__quantity-rules text--subdued text--small">{{ quantity_rules | remove_first: ' / ' | capitalize }}</p>
+              {%- endif -%}
+            {%- endif -%}
+          </div>
+
+          {%- comment -%}Special Instructions Field - Hidden for bulk order customers in quick-buy{%- endcomment -%}
+          {%- assign hide_special_instructions = false -%}
+          {%- if is_bulk_order_customer and context == 'quick-buy' -%}
+            {%- assign hide_special_instructions = true -%}
+          {%- endif -%}
+          <div class="product-form__special-instructions" data-special-instructions {% if hide_special_instructions %}style="display: none;"{% endif %}>
+            <label class="product-form__special-instructions-label" for="special-instructions-{{ section.id }}">
+              Special Instructions:
+            </label>
+            <input type="text"
+                   id="special-instructions-{{ section.id }}"
+                   form="{{ product_form_id }}"
+                   class="product-form__special-instructions-input"
+                   name="properties[Special Instructions]"
+                   placeholder="Add any special instructions here">
+          </div>
+
+          <style>
+            .product-form__special-instructions {
+              margin-top: 1rem;
+            }
+
+            .product-form__special-instructions-label {
+              display: block;
+              margin-bottom: 0.5rem;
+              font-size: 0.875rem;
+              font-weight: 500;
+              color: rgb(var(--text-color));
+            }
+
+            .product-form__special-instructions-input {
+              width: 100%;
+              padding: 0.75rem;
+              border: 1px solid rgb(var(--border-color));
+              border-radius: var(--border-radius);
+              font-size: 0.875rem;
+              background-color: rgb(var(--background));
+              color: rgb(var(--text-color));
+              font-family: inherit;
+              transition: border-color 0.2s ease;
+            }
+
+            .product-form__special-instructions-input:focus {
+              outline: none;
+              border-color: rgb(var(--text-color));
+              box-shadow: 0 0 0 1px rgb(var(--text-color));
+            }
+
+            .product-form__special-instructions-input::placeholder {
+              color: rgba(var(--text-color), 0.5);
+            }
+
+            /* Hide special instructions when in bulk mode */
+            .product-form--bulk-mode .product-form__special-instructions {
+              display: none;
+            }
+
+            @media (max-width: 768px) {
+              .product-form__special-instructions-input {
+                font-size: 0.8125rem;
+                padding: 0.625rem;
+              }
+            }
+
+            /* Pants quantity dropdown for Limit Shirts products */
+            .quantity-selector--pants-dropdown {
+              display: inline-flex;
+              align-items: center;
+            }
+
+            .quantity-selector__select {
+              padding: 0.5rem 2rem 0.5rem 0.75rem;
+              border: 1px solid rgb(var(--border-color));
+              border-radius: var(--border-radius);
+              font-size: 0.875rem;
+              background-color: rgb(var(--background));
+              color: rgb(var(--text-color));
+              font-family: inherit;
+              cursor: pointer;
+              appearance: none;
+              background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+              background-repeat: no-repeat;
+              background-position: right 0.5rem center;
+              min-width: 160px;
+            }
+
+            .quantity-selector__select:focus {
+              outline: none;
+              border-color: rgb(var(--text-color));
+              box-shadow: 0 0 0 1px rgb(var(--text-color));
+            }
+
+            .quantity-selector__select:hover {
+              border-color: rgb(var(--text-color));
+            }
+          </style>
+
+          {%- if size_chart_type -%}
+            <div class="product-form__size-chart" style="margin-top: 0.5rem; margin-bottom: 1rem;">
+              <button type="button" class="size-chart-popup-trigger" data-size-chart="{{ size_chart_type }}" style="color: #0066cc; text-decoration: underline; background: none; border: none; cursor: pointer; padding: 0; font-size: inherit;">Size Chart</button>
+            </div>
+          {%- endif -%}
+        {%- endif -%}
+
+      {%- comment -%}
+      ----------------------------------------------------------------------------------------------------------------
+      VOLUME PRICING TABLE
+      ----------------------------------------------------------------------------------------------------------------
+      {%- endcomment -%}
+
+      {%- when 'volume_pricing' -%}
+        <div data-block-type="volume-pricing" data-block-id="{{ block.id }}" {{ block.shopify_attributes }}>
+          {%- render 'volume-pricing-table', variant: product.selected_or_first_available_variant -%}
+        </div>
+
+      {%- comment -%}
+      ----------------------------------------------------------------------------------------------------------------
+      PRODUCT DESCRIPTION
+      ----------------------------------------------------------------------------------------------------------------
+      {%- endcomment -%}
+      {%- when 'description' -%}
+        {%- if product.description != blank and context != 'quick-buy' -%}
+          <div class="product-form__description rte" {{ block.shopify_attributes }}>
+            {{- product.description -}}
+          </div>
+        {%- endif -%}
+
+      {%- comment -%}
+      ----------------------------------------------------------------------------------------------------------------
+      INVENTORY
+      ----------------------------------------------------------------------------------------------------------------
+      {%- endcomment -%}
+      {%- when 'inventory' -%}
+        {%- if product.template_suffix != 'pre-order' -%}
+          <div data-block-type="inventory" data-block-id="{{ block.id }}" {{ block.shopify_attributes }}>
+            {%- if product.selected_or_first_available_variant.available or product.selected_or_first_available_variant.incoming -%}
+              <product-inventory class="product-form__inventory-wrapper">
+                {%- if product.selected_or_first_available_variant.available -%}
+                  {%- if product.selected_or_first_available_variant.inventory_management and product.selected_or_first_available_variant.inventory_policy == 'deny' and product.selected_or_first_available_variant.inventory_quantity <= block.settings.low_inventory_threshold and block.settings.low_inventory_threshold > 0 -%}
+                    <span class="inventory inventory--low">{{ 'product.form.low_stock_with_quantity_count' | t: count: product.selected_or_first_available_variant.inventory_quantity }}</span>
+                  {%- else -%}
+                    {%- if product.selected_or_first_available_variant.inventory_policy == 'continue' and product.selected_or_first_available_variant.inventory_quantity <= 0 and product.selected_or_first_available_variant.requires_shipping -%}
+                      {%- if product.selected_or_first_available_variant.incoming and product.selected_or_first_available_variant.next_incoming_date -%}
+                        {%- capture next_incoming_date -%}{{ product.selected_or_first_available_variant.next_incoming_date | date: format: 'date' }}{%- endcapture -%}
+                        <span class="inventory inventory--low">{{ 'product.form.incoming_stock' | t: next_incoming_date: next_incoming_date }}</span>
+                      {%- else -%}
+                        <span class="inventory inventory--low">{{ 'product.form.oversell_stock' | t }}</span>
+                      {%- endif -%}
+                    {%- else -%}
+                      <span class="inventory inventory--high">{{ 'product.form.in_stock' | t }}</span>
+                    {%- endif -%}
+                  {%- endif -%}
+                {%- elsif product.selected_or_first_available_variant.incoming -%}
+                  {%- if product.selected_or_first_available_variant.next_incoming_date -%}
+                    {%- capture next_incoming_date -%}{{ product.selected_or_first_available_variant.next_incoming_date | date: format: 'date' }}{%- endcapture -%}
+                    <span class="inventory inventory--low">{{ 'product.form.incoming_stock' | t: next_incoming_date: next_incoming_date }}</span>
+                  {%- else -%}
+                    <span class="inventory inventory--low">{{ 'product.form.oversell_stock' | t }}</span>
+                  {%- endif -%}
+                {%- endif -%}
+              </product-inventory>
+            {%- endif -%}
+          </div>
+        {%- endif -%}
+
+      {%- comment -%}
+      ----------------------------------------------------------------------------------------------------------------
+      BUY BUTTONS
+      ----------------------------------------------------------------------------------------------------------------
+      {%- endcomment -%}
+      {%- when 'buy_buttons' -%}
+        {%- if request.page_type != 'password' -%}
+          {%- assign recipient_feature_active = false -%}
+
+          {%- if product.gift_card? and block.settings.show_gift_card_recipient -%}
+            {%- assign recipient_feature_active = true -%}
+          {%- endif -%}
+
+          <div data-block-type="buy-buttons" data-block-id="{{ block.id }}" class="product-form__buy-buttons" {{ block.shopify_attributes }}>
+            {%- form 'product', product, is: 'product-form', id: product_form_id -%}
+              {% comment %}
+                Automatically inserted by Shop Pay Installments theme updater
+              {% endcomment %}
+              {% unless settings.disable_autogenerated_payment_terms %}
+                {{ form | payment_terms }}
+              {% endunless %}
+              {%- if recipient_feature_active -%}
+                <gift-card-recipient class="gift-card-recipient">
+                  <div class="input input--checkbox">
+                    <div class="checkbox-container">
+                      <input type="checkbox" class="checkbox" name="properties[__shopify_send_gift_card_to_recipient]" id="product-{{ section.id }}-{{ product.id }}-send-gift-card-to-recipient">
+                      <label for="product-{{ section.id }}-{{ product.id }}-send-gift-card-to-recipient" class="text--subdued">{{ 'gift_card.recipient.checkbox' | t }}</label>
+                    </div>
+                  </div>
+
+                  <div class="gift-card-recipient__fields js:hidden">
+                    <div class="input">
+                      <input id="product-{{ section.id }}-{{ product.id }}-recipient-email" type="email" class="input__field input__field--text" name="properties[Recipient email]" maxlength="138" required value="{{ form.email }}">
+                      <label for="product-{{ section.id }}-{{ product.id }}-recipient-email" class="input__label">{{ 'gift_card.recipient.email_label' | t }}</label>
+                    </div>
+
+                    <div class="input">
+                      <input id="product-{{ section.id }}-{{ product.id }}-recipient-name" type="text" class="input__field input__field--text" name="properties[Recipient name]" value="{{ form.name }}">
+                      <label for="product-{{ section.id }}-{{ product.id }}-recipient-name" class="input__label">{{ 'gift_card.recipient.name_label' | t }}</label>
+                    </div>
+
+                    <div class="input">
+                      <input type="hidden" name="properties[__shopify_offset]" value="" disabled>
+                      <input id="product-{{ section.id }}-{{ product.id }}-send-on" type="date" class="input__field input__field--text" pattern="\d{4}-\d{2}-\d{2}" name="properties[Send on]" value="{{ form.send_on }}">
+                      <label for="product-{{ section.id }}-{{ product.id }}-send-on" class="input__label">{{ 'gift_card.recipient.send_on_label' | t }}</label>
+                    </div>
+
+                    <div class="input">
+                      <textarea id="product-{{ section.id }}-{{ product.id }}-recipient-message" rows="4" maxlength="200"class="input__field input__field--textarea" name="properties[Message]">{{ form.message }}</textarea>
+                      <label for="product-{{ section.id }}-{{ product.id }}-recipient-message" class="input__label">{{ 'gift_card.recipient.message_label' | t }}</label>
+                    </div>
+                  </div>
+                </gift-card-recipient>
+              {%- endif -%}
+
+              <input type="hidden" disabled name="id" value="{{ product.selected_or_first_available_variant.id }}">
+
+              <product-payment-container {% if update_url %}id="MainPaymentContainer"{% endif %} class="product-form__payment-container" {{ block.shopify_attributes }}>
+                <button id="AddToCart" type="submit" is="loader-button" {% unless block.settings.show_payment_button and template.suffix != 'quick-buy-popover' %}data-use-primary{% endunless %} data-product-add-to-cart-button data-button-content="{% if product.template_suffix == 'pre-order' %}{{ 'product.form.pre_order' | t | escape }}{% else %}{{ 'product.form.add_to_cart' | t | escape }}{% endif %}" class="product-form__add-button button {% unless product.selected_or_first_available_variant.available %}button--ternary{% else %}{% if block.settings.show_payment_button and template.suffix != 'quick-buy-popover' %}button--secondary{% else %}button--primary{% endif %}{% endunless %} button--full" {% unless product.selected_or_first_available_variant.available %}disabled{% endunless %}>
+                  {%- if product.selected_or_first_available_variant == nil -%}
+                    {{- 'product.form.unavailable' | t -}}
+                  {%- elsif product.selected_or_first_available_variant.available -%}
+                    {%- if product.template_suffix == 'pre-order' -%}
+                      {{- 'product.form.pre_order' | t -}}
+                    {%- else -%}
+                      {{- 'product.form.add_to_cart' | t -}}
+                    {%- endif -%}
+                  {%- else -%}
+                    {{- 'product.form.sold_out' | t -}}
+                  {%- endif -%}
+                </button>
+
+                {%- comment -%}Hide Shop Pay and More Payment Options for Limit customers (except BLS bulk order customers) and Akima company customers{%- endcomment -%}
+                {%- if block.settings.show_payment_button and recipient_feature_active == false and template.suffix != 'quick-buy-popover' and context != 'quick-buy' and apply_add_to_cart_limits == false and is_akima_company_customer == false and is_manager_extended == false -%}
+                  {{ form | payment_button }}
+
+                  {%- unless product.selected_or_first_available_variant.available -%}
+                    <style>
+                      #shopify-section-{{ section.id }} .shopify-payment-button {
+                        display: none;
+                      }
+                    </style>
+                  {%- endunless -%}
+                {%- endif -%}
+              </product-payment-container>
+            {%- endform -%}
+          </div>
+        {%- endif -%}
+
+        {%- if context != 'quick-buy' -%}
+          <store-pickup data-block-type="pickup-availability" data-block-id="{{ block.id }}" class="product-form__store-availability-container">
+            {%- render 'store-availability', product_variant: product.selected_or_first_available_variant -%}
+          </store-pickup>
+        {%- endif -%}
+    {%- endcase -%}
+  {%- endfor -%}
+
+  {%- comment -%}
+  IMPLEMENTATION NOTE: under rare circumstances, merchant may want to show selectors but hide the add to cart button. This
+  is however problematic as elements changed based on this. So if we detect there is no buy buttons block, we add an empty one
+  {%- endcomment -%}
+
+  {%- assign buy_buttons_block = section.blocks | where: 'type', 'buy_buttons' | first -%}
+
+  {%- if buy_buttons_block == blank -%}
+    {%- form 'product', product, is: 'product-form', id: product_form_id -%}
+      {% comment %}
+        Automatically inserted by Shop Pay Installments theme updater
+      {% endcomment %}
+      {% unless settings.disable_autogenerated_payment_terms %}
+        {{ form | payment_terms }}
+      {% endunless %}
+      <input type="hidden" disabled name="id" value="{{ product.selected_or_first_available_variant.id }}">
+    {%- endform -%}
+  {%- endif -%}
+
+  {%- comment -%}Add to Cart - Stay on Page with Notification{%- endcomment -%}
+  <script>
+    (function() {
+      if (typeof window.AddToCartStayOnPageInitialized !== 'undefined') return;
+      window.AddToCartStayOnPageInitialized = true;
+
+      document.addEventListener('DOMContentLoaded', function() {
+        // Listen for the variant:added event which fires when item is added to cart
+        document.documentElement.addEventListener('variant:added', function(event) {
+          // Only show notification if NOT in bulk mode
+          const productForm = document.querySelector('.product-form');
+          if (productForm && !productForm.classList.contains('product-form--bulk-mode')) {
+            showAddToCartNotification(event.detail);
+          }
+        });
+
+        // Configuration for limit group maximums
+        // Add entries here to customize limits (default is 1)
+        const limitGroupMaximums = {
+          'limit shirts': 4,  // Allow up to 4 shirt items
+          'limit pants': 3,   // Allow up to 3 pants items
+          // 'limit jackets': 1, // Default is 1, no need to specify
+        };
+
+        // Special limit groups that allow multiple unique products but only qty 1 of each
+        // Products tagged with these can all be in cart, but only 1 of each product
+        const perProductLimitGroups = ['limit items'];
+
+        // Function to check if a limit group is per-product (allows multiple unique items, qty 1 each)
+        function isPerProductLimitGroup(limitGroup) {
+          return perProductLimitGroups.includes(limitGroup.toLowerCase());
+        }
+
+        // Function to get the maximum allowed items for a limit group
+        function getLimitGroupMax(limitGroup) {
+          const groupLower = limitGroup.toLowerCase();
+          return limitGroupMaximums[groupLower] || 1; // Default to 1 if not specified
+        }
+
+        // Function to update quantity selector based on remaining limit allowance
+        async function updateQuantitySelectorForLimitGroups() {
+          const productForm = document.querySelector('.product-form');
+          if (!productForm) return;
+
+          const limitGroupsAttr = productForm.getAttribute('data-limit-groups') || '';
+          if (!limitGroupsAttr) return;
+
+          const limitGroups = limitGroupsAttr.split(',').map(g => g.trim()).filter(g => g);
+          if (limitGroups.length === 0) return;
+
+          const currentProductTitle = productForm.getAttribute('data-product-title') || '';
+
+          try {
+            const response = await fetch('/cart.js');
+            const cart = await response.json();
+
+            // Count items per limit group in cart and track product titles
+            const groupCounts = {};
+            const groupProductTitles = {};
+            for (const item of cart.items) {
+              if (item.properties && item.properties._limit_group) {
+                const itemLimitGroups = item.properties._limit_group.split(',');
+                for (const itemGroup of itemLimitGroups) {
+                  const groupLower = itemGroup.toLowerCase();
+                  groupCounts[groupLower] = (groupCounts[groupLower] || 0) + item.quantity;
+                  if (!groupProductTitles[groupLower]) {
+                    groupProductTitles[groupLower] = new Set();
+                  }
+                  // Use product_title (base title) for per-product limit matching, not title (which includes variant)
+                  groupProductTitles[groupLower].add(item.product_title);
+                }
+              }
+            }
+
+            // Check for per-product limit groups first (like "Limit Items")
+            let isPerProductLimitReached = false;
+            let perProductLimitGroup = null;
+
+            for (const limitGroup of limitGroups) {
+              if (isPerProductLimitGroup(limitGroup)) {
+                const groupLower = limitGroup.toLowerCase();
+                const productTitlesInGroup = groupProductTitles[groupLower] || new Set();
+                if (productTitlesInGroup.has(currentProductTitle)) {
+                  isPerProductLimitReached = true;
+                  perProductLimitGroup = limitGroup;
+                  break;
+                }
+              }
+            }
+
+            // Find the most restrictive remaining allowance across standard limit groups
+            let minRemainingAllowance = Infinity;
+            let restrictingGroup = null;
+
+            for (const limitGroup of limitGroups) {
+              // Skip per-product limit groups in this calculation
+              if (isPerProductLimitGroup(limitGroup)) continue;
+
+              const groupLower = limitGroup.toLowerCase();
+              const maxAllowed = getLimitGroupMax(limitGroup);
+              const currentCount = groupCounts[groupLower] || 0;
+              const remaining = maxAllowed - currentCount;
+
+              if (remaining < minRemainingAllowance) {
+                minRemainingAllowance = remaining;
+                restrictingGroup = limitGroup;
+              }
+            }
+
+            // For per-product limit groups, also enforce max qty of 1
+            const hasPerProductLimitGroup = limitGroups.some(g => isPerProductLimitGroup(g));
+            if (hasPerProductLimitGroup && minRemainingAllowance > 1) {
+              minRemainingAllowance = 1;
+            }
+
+            // Update quantity selectors
+            const quantityInputs = productForm.querySelectorAll('input[name="quantity"]');
+            const quantitySelects = productForm.querySelectorAll('select[name="quantity"]');
+            const quantitySelectors = productForm.querySelectorAll('.quantity-selector');
+            const addToCartButtons = productForm.querySelectorAll('[data-product-add-to-cart-button]');
+
+            // Check if this is a "Limit Shirts" or "Limit Pants" product (has dropdown)
+            const isLimitShirtsProduct = limitGroups.some(g => g.toLowerCase() === 'limit shirts');
+            const isLimitPantsProduct = limitGroups.some(g => g.toLowerCase() === 'limit pants');
+            const maxShirts = getLimitGroupMax('Limit Shirts');
+            const maxPants = getLimitGroupMax('Limit Pants');
+            const currentShirtsInCart = groupCounts['limit shirts'] || 0;
+            const currentPantsInCart = groupCounts['limit pants'] || 0;
+            const remainingShirts = maxShirts - currentShirtsInCart;
+            const remainingPants = maxPants - currentPantsInCart;
+
+            // Determine item type for dropdown text
+            let itemTypeSingular = 'Shirt';
+            let itemTypePlural = 'Shirts';
+            if (isLimitPantsProduct) {
+              itemTypeSingular = 'Pants';
+              itemTypePlural = 'Pants';
+            }
+
+            if (isPerProductLimitReached) {
+              // Per-product limit reached - this specific item is already in cart
+              quantityInputs.forEach(input => {
+                input.value = 0;
+                input.max = 0;
+                input.disabled = true;
+              });
+              quantitySelects.forEach(select => {
+                select.disabled = true;
+              });
+              addToCartButtons.forEach(btn => {
+                btn.disabled = true;
+                btn.textContent = 'Already in Cart';
+                btn.classList.add('button--disabled');
+              });
+              // Add a notice
+              let notice = productForm.querySelector('.limit-group-notice');
+              if (!notice) {
+                notice = document.createElement('div');
+                notice.className = 'limit-group-notice';
+                notice.style.cssText = 'background: #fef3c7; border: 1px solid #f59e0b; padding: 10px 15px; border-radius: 4px; margin-bottom: 15px; font-size: 14px; color: #92400e;';
+                const firstBlock = productForm.querySelector('[data-block-type]');
+                if (firstBlock) {
+                  firstBlock.parentNode.insertBefore(notice, firstBlock);
+                }
+              }
+              notice.innerHTML = `<strong>Already in Cart:</strong> This item is already in your cart. Only 1 of each item is allowed.`;
+            } else if (minRemainingAllowance <= 0) {
+              // Standard group limit reached - no more allowed
+              quantityInputs.forEach(input => {
+                input.value = 0;
+                input.max = 0;
+                input.disabled = true;
+              });
+              quantitySelects.forEach(select => {
+                select.disabled = true;
+              });
+              addToCartButtons.forEach(btn => {
+                btn.disabled = true;
+                btn.textContent = 'Limit Reached';
+                btn.classList.add('button--disabled');
+              });
+              // Add a notice
+              let notice = productForm.querySelector('.limit-group-notice');
+              if (!notice) {
+                notice = document.createElement('div');
+                notice.className = 'limit-group-notice';
+                notice.style.cssText = 'background: #fef3c7; border: 1px solid #f59e0b; padding: 10px 15px; border-radius: 4px; margin-bottom: 15px; font-size: 14px; color: #92400e;';
+                const firstBlock = productForm.querySelector('[data-block-type]');
+                if (firstBlock) {
+                  firstBlock.parentNode.insertBefore(notice, firstBlock);
+                }
+              }
+              const groupName = restrictingGroup.replace(/^limit\s*/i, '');
+              const maxAllowed = getLimitGroupMax(restrictingGroup);
+              notice.innerHTML = `<strong>Limit Reached:</strong> You already have ${maxAllowed} "${groupName}" item${maxAllowed > 1 ? 's' : ''} in your cart.`;
+            } else {
+              // Set max to remaining allowance for regular inputs
+              quantityInputs.forEach(input => {
+                input.max = minRemainingAllowance;
+                input.disabled = false;
+                // If current value exceeds max, reset to max
+                if (parseInt(input.value) > minRemainingAllowance) {
+                  input.value = minRemainingAllowance;
+                }
+                // Ensure value is at least 1
+                if (parseInt(input.value) < 1) {
+                  input.value = 1;
+                }
+              });
+
+              // Update pants dropdown options based on remaining allowance
+              quantitySelects.forEach(select => {
+                select.disabled = false;
+                // Rebuild options based on remaining allowance
+                const currentValue = parseInt(select.value) || 0;
+                select.innerHTML = '';
+
+                // Always add 0 option
+                const opt0 = document.createElement('option');
+                opt0.value = '0';
+                opt0.textContent = `0 ${itemTypePlural} (by default)`;
+                select.appendChild(opt0);
+
+                // Add options up to remaining allowance (respects group max)
+                const dropdownMax = isLimitPantsProduct ? maxPants : isLimitShirtsProduct ? maxShirts : 2;
+                for (let i = 1; i <= Math.min(minRemainingAllowance, dropdownMax); i++) {
+                  const opt = document.createElement('option');
+                  opt.value = i.toString();
+                  opt.textContent = i === 1 ? `1 ${itemTypeSingular}` : `${i} ${itemTypePlural}`;
+                  select.appendChild(opt);
+                }
+
+                // Restore previous value if still valid, otherwise reset to 0
+                if (currentValue <= minRemainingAllowance && currentValue <= dropdownMax) {
+                  select.value = currentValue.toString();
+                } else {
+                  select.value = '0';
+                }
+              });
+
+              addToCartButtons.forEach(btn => {
+                btn.disabled = false;
+                btn.classList.remove('button--disabled');
+                // Restore original text if it was changed
+                if (btn.textContent === 'Limit Reached' || btn.textContent === 'Already in Cart') {
+                  btn.textContent = 'Add to Cart';
+                }
+              });
+
+              // Show remaining allowance notice for Limit Shirts or Limit Pants products
+              let notice = productForm.querySelector('.limit-group-notice');
+              const showShirtsNotice = isLimitShirtsProduct && currentShirtsInCart > 0 && remainingShirts > 0;
+              const showPantsNotice = isLimitPantsProduct && currentPantsInCart > 0 && remainingPants > 0;
+
+              if (showShirtsNotice || showPantsNotice) {
+                // Show info about remaining items
+                if (!notice) {
+                  notice = document.createElement('div');
+                  notice.className = 'limit-group-notice';
+                  notice.style.cssText = 'background: #dbeafe; border: 1px solid #3b82f6; padding: 10px 15px; border-radius: 4px; margin-bottom: 15px; font-size: 14px; color: #1e40af;';
+                  const firstBlock = productForm.querySelector('[data-block-type]');
+                  if (firstBlock) {
+                    firstBlock.parentNode.insertBefore(notice, firstBlock);
+                  }
+                } else {
+                  // Update styling to info style
+                  notice.style.cssText = 'background: #dbeafe; border: 1px solid #3b82f6; padding: 10px 15px; border-radius: 4px; margin-bottom: 15px; font-size: 14px; color: #1e40af;';
+                }
+
+                if (showShirtsNotice) {
+                  const shirtWord = remainingShirts === 1 ? 'shirt' : 'shirts';
+                  notice.innerHTML = `<strong>Shirt Allowance:</strong> You have ${remainingShirts} more ${shirtWord} left to select. (${currentShirtsInCart} of ${maxShirts} in cart)`;
+                } else if (showPantsNotice) {
+                  const pantsWord = 'pants';
+                  notice.innerHTML = `<strong>Pants Allowance:</strong> You have ${remainingPants} more ${pantsWord} left to select. (${currentPantsInCart} of ${maxPants} in cart)`;
+                }
+              } else if (notice) {
+                // Remove notice if nothing in cart
+                notice.remove();
+              }
+            }
+
+            console.log('Limit group quantity update:', { limitGroups, groupCounts, minRemainingAllowance, isPerProductLimitReached });
+          } catch (error) {
+            console.error('Error updating quantity selector for limit groups:', error);
+          }
+        }
+
+        // Run on page load
+        updateQuantitySelectorForLimitGroups();
+
+        // Run when cart is updated
+        document.documentElement.addEventListener('cart:refresh', updateQuantitySelectorForLimitGroups);
+
+        // Function to check cart for existing limit group items
+        async function checkCartForLimitGroup(limitGroups, currentProductTitle, quantityToAdd = 1) {
+          if (!limitGroups || limitGroups.length === 0) return { allowed: true };
+
+          try {
+            const response = await fetch('/cart.js');
+            const cart = await response.json();
+
+            // Count items per limit group in cart
+            const groupCounts = {};
+            const groupItems = {};
+            // Track product titles per group for per-product limit checks
+            const groupProductTitles = {};
+
+            for (const item of cart.items) {
+              if (item.properties && item.properties._limit_group) {
+                const itemLimitGroups = item.properties._limit_group.split(',');
+                for (const itemGroup of itemLimitGroups) {
+                  const groupLower = itemGroup.toLowerCase();
+                  groupCounts[groupLower] = (groupCounts[groupLower] || 0) + item.quantity;
+                  if (!groupItems[groupLower]) {
+                    groupItems[groupLower] = [];
+                  }
+                  groupItems[groupLower].push(item.title);
+                  // Track unique product titles (use product_title for per-product limit matching)
+                  if (!groupProductTitles[groupLower]) {
+                    groupProductTitles[groupLower] = new Set();
+                  }
+                  groupProductTitles[groupLower].add(item.product_title);
+                }
+              }
+            }
+
+            // Check if adding this product would exceed any limit
+            for (const limitGroup of limitGroups) {
+              const groupLower = limitGroup.toLowerCase();
+
+              // Special handling for per-product limit groups (like "Limit Items")
+              // These allow multiple unique products, but only qty 1 of each
+              if (isPerProductLimitGroup(limitGroup)) {
+                const productTitlesInGroup = groupProductTitles[groupLower] || new Set();
+                if (productTitlesInGroup.has(currentProductTitle)) {
+                  return {
+                    allowed: false,
+                    conflictingItems: [currentProductTitle],
+                    limitGroup: limitGroup,
+                    maxAllowed: 1,
+                    currentCount: 1,
+                    isPerProductLimit: true
+                  };
+                }
+                // For per-product limits, continue checking other groups
+                continue;
+              }
+
+              // Standard limit group check (total count across group)
+              // Now checks if currentCount + quantityToAdd would exceed maxAllowed
+              const maxAllowed = getLimitGroupMax(limitGroup);
+              const currentCount = groupCounts[groupLower] || 0;
+              const remaining = maxAllowed - currentCount;
+
+              if (quantityToAdd > remaining) {
+                return {
+                  allowed: false,
+                  conflictingItems: groupItems[groupLower] || [],
+                  limitGroup: limitGroup,
+                  maxAllowed: maxAllowed,
+                  currentCount: currentCount,
+                  remaining: remaining,
+                  quantityRequested: quantityToAdd
+                };
+              }
+            }
+            return { allowed: true };
+          } catch (error) {
+            console.error('Error checking cart:', error);
+            return { allowed: true }; // Allow on error to not block user
+          }
+        }
+
+        // Function to show limit group error
+        function showLimitGroupError(conflictingItems, limitGroup, currentProductTitle, maxAllowed, isPerProductLimit, remaining = 0, quantityRequested = 1) {
+          const groupName = limitGroup.replace(/^limit\s*/i, '');
+          let message;
+
+          if (isPerProductLimit) {
+            // Per-product limit message (like "Limit Items")
+            message = `You already have "${currentProductTitle}" in your cart. Only 1 of each item is allowed.`;
+          } else if (remaining > 0 && quantityRequested > remaining) {
+            // Partial allowance message - user tried to add more than allowed
+            const shirtWord = remaining === 1 ? 'shirt' : 'shirts';
+            message = `You tried to add ${quantityRequested} shirts, but you can only add ${remaining} more ${shirtWord}. You have ${maxAllowed - remaining} of ${maxAllowed} shirts already in your cart.`;
+          } else {
+            // Standard group limit message - no more allowed
+            const itemWord = maxAllowed === 1 ? 'item' : 'items';
+            const conflictingList = Array.isArray(conflictingItems) ? conflictingItems.join('", "') : conflictingItems;
+            message = `You can only add ${maxAllowed} "${groupName}" ${itemWord} to your cart. You already have "${conflictingList}" in your cart. Please remove ${maxAllowed === 1 ? 'it' : 'one'} first if you want to add "${currentProductTitle}".`;
+          }
+
+          // Create error notification
+          const notification = document.createElement('div');
+          notification.className = 'limit-group-error-notification';
+          notification.innerHTML = `
+            <div style="display: flex; align-items: flex-start; gap: 10px;">
+              <span style="font-size: 20px;">⚠️</span>
+              <div>
+                <strong>Item Limit Reached</strong>
+                <p style="margin: 5px 0 0 0; font-weight: normal;">${message}</p>
+              </div>
+            </div>
+          `;
+          notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10001;
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius, 4px);
+            font-weight: 500;
+            background-color: #dc2626;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            max-width: 500px;
+            text-align: left;
+          `;
+
+          document.body.appendChild(notification);
+
+          // Remove after 6 seconds
+          setTimeout(function() {
+            if (notification.parentNode) {
+              notification.parentNode.removeChild(notification);
+            }
+          }, 6000);
+        }
+
+        function showAddToCartNotification(detail) {
+          // Create notification element matching Bulk Order style
+          const notification = document.createElement('div');
+          notification.className = 'add-to-cart-notification';
+          notification.textContent = 'Added to cart successfully!';
+          notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10000;
+            padding: 0.75rem 1.25rem;
+            border-radius: var(--border-radius, 4px);
+            font-weight: 500;
+            background-color: rgb(5, 150, 105);
+            color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          `;
+
+          // Add notification to page
+          document.body.appendChild(notification);
+
+          // Trigger cart refresh event
+          document.documentElement.dispatchEvent(new CustomEvent('cart:refresh', { bubbles: true }));
+
+          // Remove notification after 3 seconds
+          setTimeout(function() {
+            if (notification.parentNode) {
+              notification.parentNode.removeChild(notification);
+            }
+          }, 3000);
+        }
+
+        // Intercept form submissions to prevent redirect
+        document.addEventListener('submit', async function(event) {
+          const form = event.target;
+
+          console.log('Form submitted:', form);
+          console.log('Form attribute is:', form.getAttribute('is'));
+          console.log('Form id:', form.id);
+
+          // Check if this is a product form in regular mode (not bulk)
+          if (form.getAttribute('is') === 'product-form') {
+            const productForm = form.closest('.product-form');
+            console.log('Found product form container:', productForm);
+            console.log('Has bulk mode class:', productForm ? productForm.classList.contains('product-form--bulk-mode') : 'N/A');
+
+            if (productForm && !productForm.classList.contains('product-form--bulk-mode')) {
+              console.log('Processing regular order form submission');
+
+              // Prevent default form submission and stop propagation
+              event.preventDefault();
+              event.stopPropagation();
+              event.stopImmediatePropagation();
+
+              // Check if we've already processed this submission
+              if (form.dataset.processing === 'true') {
+                console.log('Already processing, skipping');
+                return;
+              }
+              form.dataset.processing = 'true';
+
+              // Get limit groups and product title from the product form container
+              const limitGroupsAttr = productForm.getAttribute('data-limit-groups') || '';
+              const productTitle = productForm.getAttribute('data-product-title') || 'this item';
+              const limitGroups = limitGroupsAttr ? limitGroupsAttr.split(',').map(g => g.trim()).filter(g => g) : [];
+
+              // Get quantity being added BEFORE the limit check
+              const quantityInput = form.querySelector('input[name="quantity"]');
+              const quantitySelect = form.querySelector('select[name="quantity"]');
+              let quantityToAdd = 1;
+              if (quantitySelect) {
+                quantityToAdd = parseInt(quantitySelect.value) || 1;
+              } else if (quantityInput) {
+                quantityToAdd = parseInt(quantityInput.value) || 1;
+              }
+
+              // If quantity is 0, don't add to cart
+              if (quantityToAdd === 0) {
+                form.dataset.processing = 'false';
+                return;
+              }
+
+              // Get the add to cart button
+              const addButton = form.querySelector('[data-product-add-to-cart-button]');
+              const originalButtonText = addButton ? addButton.textContent : '';
+
+              // Disable button and show loading state
+              if (addButton) {
+                addButton.disabled = true;
+                addButton.textContent = 'Checking...';
+              }
+
+              // Check for limit group conflicts if this product has limit groups
+              if (limitGroups.length > 0) {
+                const checkResult = await checkCartForLimitGroup(limitGroups, productTitle, quantityToAdd);
+                if (!checkResult.allowed) {
+                  // Show error and abort
+                  showLimitGroupError(checkResult.conflictingItems, checkResult.limitGroup, productTitle, checkResult.maxAllowed, checkResult.isPerProductLimit, checkResult.remaining, checkResult.quantityRequested);
+                  if (addButton) {
+                    addButton.disabled = false;
+                    addButton.textContent = originalButtonText;
+                  }
+                  form.dataset.processing = 'false';
+                  return;
+                }
+              }
+
+              // Update button text
+              if (addButton) {
+                addButton.textContent = 'Adding...';
+              }
+
+              // Get form data
+              const formData = new FormData(form);
+
+              // Get variant ID - check multiple sources since input might be disabled
+              let variantId = formData.get('id');
+              if (!variantId) {
+                // Try to get from input directly (even if disabled)
+                const idInput = form.querySelector('input[name="id"]');
+                if (idInput) {
+                  variantId = idInput.value;
+                }
+              }
+              if (!variantId) {
+                // Try to get from select element
+                const idSelect = form.querySelector('select[name="id"]');
+                if (idSelect) {
+                  variantId = idSelect.value;
+                }
+              }
+
+              console.log('Variant ID found:', variantId);
+
+              if (!variantId) {
+                console.error('Could not find variant ID');
+                alert('Please select a product variant before adding to cart.');
+                if (addButton) {
+                  addButton.disabled = false;
+                  addButton.textContent = originalButtonText;
+                }
+                form.dataset.processing = 'false';
+                return;
+              }
+
+              const data = {
+                items: [{
+                  id: variantId,
+                  quantity: parseInt(formData.get('quantity')) || 1,
+                  properties: {}
+                }]
+              };
+
+              // Collect all properties (anything with properties[...] in the name)
+              for (let [key, value] of formData.entries()) {
+                if (key.startsWith('properties[') && key.endsWith(']')) {
+                  // Extract property name from properties[PropertyName]
+                  const propertyName = key.slice(11, -1); // Remove 'properties[' and ']'
+                  if (value && value.trim() !== '') {
+                    data.items[0].properties[propertyName] = value;
+                  }
+                }
+              }
+
+              // Add limit groups as a hidden property if they exist
+              if (limitGroups.length > 0) {
+                data.items[0].properties['_limit_group'] = limitGroups.join(',');
+              }
+
+              // Submit via AJAX
+              fetch('/cart/add.js', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json'
+                },
+                body: JSON.stringify(data)
+              })
+              .then(response => {
+                if (!response.ok) {
+                  return response.json().then(err => {
+                    throw new Error(err.description || 'Failed to add to cart');
+                  });
+                }
+                return response.json();
+              })
+              .then(result => {
+                // Show success notification
+                showAddToCartNotification(result);
+
+                // Refresh the page after a brief delay to let user see the notification
+                setTimeout(function() {
+                  window.location.reload();
+                }, 800);
+              })
+              .catch(error => {
+                console.error('Error adding to cart:', error);
+                alert(error.message || 'Failed to add item to cart. Please try again.');
+              })
+              .finally(() => {
+                // Re-enable button and restore text
+                if (addButton) {
+                  addButton.disabled = false;
+                  addButton.textContent = originalButtonText;
+                }
+                // Clear processing flag
+                form.dataset.processing = 'false';
+              });
+            }
+          }
+        }, true); // Use capture phase to intercept before theme handlers
+      });
+    })();
+  </script>
+</div>
+
+{%- comment -%}
+IMPLEMENTATION NOTE: if during the iteration of the options we have found an option matching a size chart, we add it here
+{%- endcomment -%}
+
+{%- if found_size_option and size_chart_page != blank -%}
+  {%- comment -%}Drawer is for tablet and desktop{%- endcomment -%}
+  <drawer-content id="product-{{ section.id }}-{{ product.id }}-size-chart-drawer" class="drawer drawer--large hidden-phone">
+    <span class="drawer__overlay"></span>
+
+    <header class="drawer__header">
+      <p class="drawer__title heading h6">{{ size_chart_page.title }}</p>
+
+      <button type="button" class="drawer__close-button tap-area" data-action="close" title="{{ 'general.accessibility.close' | t | escape }}">
+        {%- render 'icon' with 'close' -%}
+      </button>
+    </header>
+
+    <div class="drawer__content drawer__content--padded-start">
+      <div class="rte">
+        {{- size_chart_page.content -}}
+      </div>
+    </div>
+  </drawer-content>
+
+  {%- comment -%}Popover is for mobile{%- endcomment -%}
+  <popover-content id="product-{{ section.id }}-{{ product.id }}-size-chart-popover" class="popover hidden-lap-and-up">
+    <span class="popover__overlay"></span>
+
+    <header class="popover__header">
+      <p class="popover__title heading h6">{{ size_chart_page.title }}</p>
+
+      <button type="button" class="popover__close-button tap-area tap-area--large" data-action="close" title="{{ 'general.accessibility.close' | t | escape }}">
+        {%- render 'icon' with 'close' -%}
+      </button>
+    </header>
+
+    <div class="popover__content">
+      <div class="rte">
+        {{- size_chart_page.content -}}
+      </div>
+    </div>
+  </popover-content>
+{%- endif -%}
+
+{%- comment -%}
+Size Chart Image Popup (replaces drawer/popover for belt and shirt size charts)
+{%- endcomment -%}
+{%- comment -%}Size chart popup is created dynamically on document.body via JS to escape drawer stacking context{%- endcomment -%}
+
+<style>
+  .size-chart-popup {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .size-chart-popup__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+
+  .size-chart-popup__content {
+    position: relative;
+    max-width: 900px;
+    max-height: 90vh;
+    width: 100%;
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: auto;
+  }
+
+  .size-chart-popup__close {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    background: none;
+    border: none;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    color: #333;
+    z-index: 1;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.2s;
+  }
+
+  .size-chart-popup__close:hover {
+    background: rgba(0, 0, 0, 0.08);
+  }
+
+  .size-chart-popup__image {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 6px;
+  }
+
+  @media (max-width: 600px) {
+    .size-chart-popup__content {
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .size-chart-popup__close {
+      top: 6px;
+      right: 8px;
+    }
+  }
+</style>
+
+<script>
+  (function() {
+    if (typeof window.SizeChartPopupInitialized !== 'undefined') return;
+    window.SizeChartPopupInitialized = true;
+
+    var sizeChartImages = {
+      belt: 'https://cdn.shopify.com/s/files/1/0692/4130/7445/files/Nylon_Duty_Belt_Size_Chart_2.png?v=1770045416',
+      shirt: 'https://cdn.shopify.com/s/files/1/0692/4130/7445/files/GFS_All_Polyester_Long_Sleeve_Shirt_Size_Chart_v2.png?v=1770653920',
+      pants: 'https://cdn.shopify.com/s/files/1/0692/4130/7445/files/H-BDU-Trousers_Size_Chart_1.png?v=1773695380'
+    };
+
+    // Ensure there is always a single popup element on document.body so it escapes
+    // drawer/popover stacking contexts (transform, overflow, etc.)
+    function getOrCreateBodyPopup() {
+      var popup = document.getElementById('size-chart-popup-body');
+      if (!popup) {
+        popup = document.createElement('div');
+        popup.id = 'size-chart-popup-body';
+        popup.className = 'size-chart-popup';
+        popup.style.display = 'none';
+        popup.innerHTML =
+          '<div class="size-chart-popup__backdrop"></div>' +
+          '<div class="size-chart-popup__content">' +
+            '<button type="button" class="size-chart-popup__close" aria-label="Close size chart">&times;</button>' +
+            '<img id="size-chart-popup-img-body" src="" alt="Size Chart" class="size-chart-popup__image" width="900" height="600">' +
+          '</div>';
+        document.body.appendChild(popup);
+      }
+      return popup;
+    }
+
+    document.addEventListener('click', function(e) {
+      var trigger = e.target.closest('.size-chart-popup-trigger');
+      if (!trigger) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      var chartType = trigger.getAttribute('data-size-chart');
+      var imageUrl = sizeChartImages[chartType];
+      if (!imageUrl) return;
+
+      var popup = getOrCreateBodyPopup();
+      var img = popup.querySelector('.size-chart-popup__image');
+      img.src = imageUrl;
+      var altNames = { belt: 'Nylon Duty Belt', shirt: 'GFS All Polyester Long Sleeve Shirt', pants: 'H-BDU Trousers' };
+      img.alt = (altNames[chartType] || chartType) + ' Size Chart';
+      popup.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }, true);
+
+    // Block mousedown, touchstart, AND click on the popup from reaching the
+    // drawer/popover focus trap. The focus trap deactivates (closes the drawer)
+    // on mousedown via checkPointerDown, not click — so we must intercept all three.
+    function blockPopupEvent(e) {
+      var popup = document.getElementById('size-chart-popup-body');
+      if (!popup || popup.style.display === 'none') return;
+
+      if (e.target.closest('#size-chart-popup-body')) {
+        e.stopImmediatePropagation();
+
+        if (e.target.closest('.size-chart-popup__close') || e.target.closest('.size-chart-popup__backdrop')) {
+          e.preventDefault();
+          popup.style.display = 'none';
+          document.body.style.overflow = '';
+        }
+      }
+    }
+    document.addEventListener('mousedown', blockPopupEvent, true);
+    document.addEventListener('touchstart', blockPopupEvent, true);
+    document.addEventListener('click', blockPopupEvent, true);
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        var popup = document.getElementById('size-chart-popup-body');
+        if (popup && popup.style.display !== 'none') {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          popup.style.display = 'none';
+          document.body.style.overflow = '';
+        }
+      }
+    }, true);
+  })();
+</script>
+
+{%- if is_manager_extended -%}
+<style>
+  .footer__aside { display: none !important; }
+</style>
+{%- endif -%}

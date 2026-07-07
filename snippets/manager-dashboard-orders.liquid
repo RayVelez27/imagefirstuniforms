@@ -1,0 +1,1214 @@
+{%- comment -%}
+  Manager Dashboard - Orders Tab
+  Displays all orders from users with the same company tag
+
+  Parameters:
+  - customer: The logged-in customer object
+{%- endcomment -%}
+
+<div class="dashboard-orders">
+  <div class="dashboard-section-header">
+    <h2 class="heading h3">Company Orders</h2>
+  </div>
+
+  {%- comment -%} Loading state {%- endcomment -%}
+  <div id="orders-loading" class="dashboard-loading">
+    <p>Loading orders...</p>
+  </div>
+
+  {%- comment -%} Error state {%- endcomment -%}
+  <div id="orders-error" class="dashboard-error" style="display: none;">
+    <p><strong>Error:</strong> <span id="orders-error-message"></span></p>
+  </div>
+
+  {%- comment -%} Orders table container {%- endcomment -%}
+  <div id="orders-container" class="dashboard-table-wrapper" style="display: none;">
+    <div class="orders-summary" id="orders-summary" style="margin-bottom: 20px; padding: 15px; background: #f8f8f8; border-radius: 4px;">
+      <p style="margin: 0; font-weight: 500;">Company: <span id="company-name">-</span> | Total Orders: <span id="total-orders">0</span></p>
+    </div>
+
+    {%- comment -%} Search and Filter Controls {%- endcomment -%}
+    <div class="dashboard-filters">
+      <div class="dashboard-filters__search">
+        <input type="text" id="orders-search" class="dashboard-filters__input" placeholder="Search by order #, customer, or email...">
+        <svg class="dashboard-filters__search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </div>
+      <div class="dashboard-filters__dropdowns">
+        <select id="orders-filter-status" class="dashboard-filters__select">
+          <option value="">All Statuses</option>
+          <option value="unfulfilled">Unfulfilled</option>
+          <option value="fulfilled">Fulfilled</option>
+          <option value="partial">Partially Fulfilled</option>
+        </select>
+        <select id="orders-filter-date" class="dashboard-filters__select">
+          <option value="">All Time</option>
+          <option value="7">Last 7 Days</option>
+          <option value="30">Last 30 Days</option>
+          <option value="90">Last 90 Days</option>
+          <option value="180">Last 180 Days</option>
+          <option value="365">Last 1 Year</option>
+        </select>
+      </div>
+      <div class="dashboard-filters__results">
+        <span id="orders-filter-count">Showing all orders</span>
+      </div>
+    </div>
+
+    <table class="dashboard-table">
+      <thead>
+        <tr>
+          <th>Order #</th>
+          <th>Customer</th>
+          <th>Email</th>
+          <th>Date</th>
+          <th>Total</th>
+          <th>Fulfillment</th>
+          <th>Tracking #</th>
+        </tr>
+      </thead>
+      <tbody id="orders-table-body">
+        {%- comment -%} Orders will be populated via JavaScript {%- endcomment -%}
+      </tbody>
+    </table>
+  </div>
+
+  {%- comment -%} Empty state {%- endcomment -%}
+  <div id="orders-empty" class="dashboard-empty" style="display: none;">
+    <p>No orders found for your company.</p>
+  </div>
+
+  {%- comment -%} Tracking Numbers Modal {%- endcomment -%}
+  <div id="tracking-modal" class="tracking-modal" style="display: none;">
+    <div class="tracking-modal__content">
+      <div class="tracking-modal__header">
+        <h3>Tracking Numbers</h3>
+        <button id="close-tracking-modal" class="tracking-modal__close">&times;</button>
+      </div>
+      <div class="tracking-modal__body">
+        <p class="tracking-modal__order-name" id="tracking-modal-order-name"></p>
+        <ul class="tracking-modal__list" id="tracking-modal-list">
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  {%- comment -%} Order Details Panel (inline, replaces modal) {%- endcomment -%}
+  <div id="order-details-panel" class="order-details-panel" style="display: none;">
+    <div class="order-details-panel__header">
+      <button id="back-to-orders" class="button button--outline button--small">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        Back to Orders
+      </button>
+    </div>
+
+    <div class="order-details-panel__title">
+      <h1 class="heading h4" id="panel-order-name"></h1>
+      <span class="text--subdued" id="panel-order-date"></span>
+    </div>
+
+    {%- comment -%} Fulfillment Banner {%- endcomment -%}
+    <div id="panel-fulfillment-banner" class="banner banner--success" style="display: none; margin: 20px 0;">
+      <span class="banner__ribbon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      </span>
+      <p class="banner__content" id="panel-fulfillment-message"></p>
+    </div>
+
+    {%- comment -%} Line Items Table {%- endcomment -%}
+    <div class="order-details-panel__items">
+      <table class="line-item-table table table--loose table--footered">
+        <thead class="line-item-table__header-group">
+          <tr>
+            <th><span class="heading heading--xsmall text--subdued">Product</span></th>
+            <th><span class="heading heading--xsmall text--subdued text--center">Quantity</span></th>
+            <th><span class="heading heading--xsmall text--subdued text--right">Total</span></th>
+          </tr>
+        </thead>
+        <tbody id="panel-line-items" class="line-item-table__list">
+        </tbody>
+        <tfoot id="panel-order-totals" class="line-item-table__footer">
+        </tfoot>
+      </table>
+    </div>
+
+    {%- comment -%} Customer & Contact Info {%- endcomment -%}
+    <div class="order-details-panel__contact">
+      <h2 class="heading h5">Contact Information</h2>
+      <div class="order-details-panel__contact-grid">
+        <div class="order-details-panel__contact-item">
+          <span class="heading heading--small">Customer</span>
+          <p id="panel-customer-name"></p>
+        </div>
+        <div class="order-details-panel__contact-item">
+          <span class="heading heading--small">Email</span>
+          <p id="panel-customer-email"></p>
+        </div>
+        <div class="order-details-panel__contact-item" id="panel-phone-section" style="display: none;">
+          <span class="heading heading--small">Phone</span>
+          <p id="panel-customer-phone"></p>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Addresses {%- endcomment -%}
+    <div class="order-details-panel__addresses">
+      <h2 class="heading h5">Addresses</h2>
+      <div class="order-details-panel__addresses-grid">
+        <div class="order-details-panel__address" id="panel-billing-section" style="display: none;">
+          <span class="heading heading--small">Billing Address</span>
+          <div id="panel-billing-address"></div>
+        </div>
+        <div class="order-details-panel__address" id="panel-shipping-section" style="display: none;">
+          <span class="heading heading--small">Shipping Address</span>
+          <div id="panel-shipping-address"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_ENDPOINT = 'https://image-first-portal.netlify.app/.netlify/functions/manager-orders';
+
+  let ordersData = [];
+  let filteredOrdersData = [];
+
+  // Normalize fulfillment status to only: fulfilled, unfulfilled, partial
+  function normalizeStatus(status) {
+    if (!status) return 'unfulfilled';
+    const s = status.toLowerCase();
+    if (s === 'fulfilled') return 'fulfilled';
+    if (s === 'partial' || s === 'partially_fulfilled' || s === 'partially fulfilled') return 'partial';
+    return 'unfulfilled';
+  }
+
+  function getStatusDisplay(status) {
+    const normalized = normalizeStatus(status);
+    if (normalized === 'fulfilled') return 'Fulfilled';
+    if (normalized === 'partial') return 'Partially Fulfilled';
+    return 'Unfulfilled';
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    loadOrders();
+    initializeOrderPanel();
+    initializeOrderFilters();
+    initializeTrackingModal();
+  });
+
+  function initializeOrderPanel() {
+    const backBtn = document.getElementById('back-to-orders');
+    backBtn.addEventListener('click', hideOrderDetails);
+  }
+
+  function initializeOrderFilters() {
+    const searchInput = document.getElementById('orders-search');
+    const statusFilter = document.getElementById('orders-filter-status');
+    const dateFilter = document.getElementById('orders-filter-date');
+
+    searchInput.addEventListener('input', debounce(applyOrderFilters, 300));
+    statusFilter.addEventListener('change', applyOrderFilters);
+    dateFilter.addEventListener('change', applyOrderFilters);
+  }
+
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  function applyOrderFilters() {
+    const searchTerm = document.getElementById('orders-search').value.toLowerCase().trim();
+    const statusFilter = document.getElementById('orders-filter-status').value;
+    const dateFilter = document.getElementById('orders-filter-date').value;
+
+    filteredOrdersData = ordersData.filter(order => {
+      // Search filter
+      if (searchTerm) {
+        const searchFields = [
+          order.orderName || '',
+          order.orderNumber || '',
+          order.customer || '',
+          order.email || ''
+        ].join(' ').toLowerCase();
+
+        if (!searchFields.includes(searchTerm)) {
+          return false;
+        }
+      }
+
+      // Status filter
+      if (statusFilter) {
+        const orderStatus = normalizeStatus(order.fulfillment);
+        if (orderStatus !== statusFilter) {
+          return false;
+        }
+      }
+
+      // Date filter
+      if (dateFilter) {
+        const orderDate = new Date(order.date);
+        const now = new Date();
+        const daysAgo = parseInt(dateFilter);
+        const cutoffDate = new Date(now.setDate(now.getDate() - daysAgo));
+
+        if (orderDate < cutoffDate) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    renderOrdersTable(filteredOrdersData);
+    updateOrderFilterCount();
+  }
+
+  function updateOrderFilterCount() {
+    const countEl = document.getElementById('orders-filter-count');
+    const total = ordersData.length;
+    const filtered = filteredOrdersData.length;
+
+    if (filtered === total) {
+      countEl.textContent = `Showing all ${total} orders`;
+    } else {
+      countEl.textContent = `Showing ${filtered} of ${total} orders`;
+    }
+  }
+
+  function showOrderDetails(orderIndex) {
+    const order = ordersData[orderIndex];
+    if (!order) return;
+
+    const container = document.getElementById('orders-container');
+    const panel = document.getElementById('order-details-panel');
+
+    // Hide table, show panel
+    container.style.display = 'none';
+    panel.style.display = 'block';
+
+    // Populate header
+    document.getElementById('panel-order-name').textContent = `Order ${order.orderName || order.orderNumber}`;
+    document.getElementById('panel-order-date').textContent = formatDateTime(order.date);
+
+    // Fulfillment banner
+    const fulfillmentBanner = document.getElementById('panel-fulfillment-banner');
+    const fulfillmentMessage = document.getElementById('panel-fulfillment-message');
+    const normalizedStatus = normalizeStatus(order.fulfillment);
+    if (normalizedStatus === 'fulfilled' && order.trackingNumbers && order.trackingNumbers.length > 0) {
+      fulfillmentBanner.style.display = 'flex';
+      if (order.trackingNumbers.length === 1) {
+        fulfillmentMessage.innerHTML = `Fulfilled with tracking number: <a href="https://www.ups.com/track?tracknum=${encodeURIComponent(order.trackingNumbers[0])}" target="_blank" rel="noopener noreferrer">${escapeHtml(order.trackingNumbers[0])}</a>`;
+      } else {
+        const trackingLinks = order.trackingNumbers.map(t =>
+          `<a href="https://www.ups.com/track?tracknum=${encodeURIComponent(t)}" target="_blank" rel="noopener noreferrer">${escapeHtml(t)}</a>`
+        ).join(', ');
+        fulfillmentMessage.innerHTML = `Fulfilled with ${order.trackingNumbers.length} tracking numbers: ${trackingLinks}`;
+      }
+    } else if (normalizedStatus === 'fulfilled') {
+      fulfillmentBanner.style.display = 'flex';
+      fulfillmentMessage.textContent = 'This order has been fulfilled.';
+    } else {
+      fulfillmentBanner.style.display = 'none';
+    }
+
+    // Line items
+    const lineItemsBody = document.getElementById('panel-line-items');
+    lineItemsBody.innerHTML = '';
+
+    if (order.lineItems && order.lineItems.length > 0) {
+      order.lineItems.forEach(item => {
+        const lineTotal = (parseFloat(item.price) * item.quantity).toFixed(2);
+        const row = document.createElement('tr');
+        row.className = 'line-item';
+
+        // Build image HTML - always show placeholder container, load image if available
+        const imageHtml = `
+          <div class="line-item__image-wrapper">
+            ${item.image
+              ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" class="line-item__image" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                 <div class="line-item__image-placeholder" style="display: none;">
+                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                 </div>`
+              : `<div class="line-item__image-placeholder">
+                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                 </div>`
+            }
+          </div>`;
+
+        row.innerHTML = `
+          <td class="line-item__product">
+            <div class="line-item__content-wrapper">
+              ${imageHtml}
+              <div class="line-item__info">
+                <div class="product-item-meta">
+                  <span class="product-item-meta__title">${escapeHtml(item.title || 'N/A')}</span>
+                  ${item.variantTitle ? `<span class="product-item-meta__property text--subdued text--xsmall">${escapeHtml(item.variantTitle)}</span>` : ''}
+                  ${item.sku ? `<span class="product-item-meta__property text--subdued text--xsmall">SKU: ${escapeHtml(item.sku)}</span>` : ''}
+                  <div class="price-list text--small">${order.currency || ''} ${formatMoney(item.price)}</div>
+                </div>
+              </div>
+            </div>
+          </td>
+          <td class="line-item__quantity text--center">${item.quantity}</td>
+          <td class="line-item__price-list-container text--right">
+            <div class="price-list price-list--stack">${order.currency || ''} ${formatMoney(lineTotal)}</div>
+          </td>
+        `;
+        lineItemsBody.appendChild(row);
+      });
+    }
+
+    // Order totals
+    const totalsBody = document.getElementById('panel-order-totals');
+    totalsBody.innerHTML = `
+      <tr class="text--subdued">
+        <td></td>
+        <td>Subtotal</td>
+        <td class="text--right">${order.currency || ''} ${formatMoney(order.subtotal)}</td>
+      </tr>
+      <tr class="text--subdued">
+        <td></td>
+        <td>Shipping</td>
+        <td class="text--right">${order.currency || ''} ${formatMoney(order.shippingTotal || 0)}</td>
+      </tr>
+      <tr class="text--subdued">
+        <td></td>
+        <td>Tax</td>
+        <td class="text--right">${order.currency || ''} ${formatMoney(order.taxTotal || 0)}</td>
+      </tr>
+      <tr class="text--strong">
+        <td></td>
+        <td>Total</td>
+        <td class="text--right">${order.currency || ''} ${formatMoney(order.total)}</td>
+      </tr>
+    `;
+
+    // Contact info
+    document.getElementById('panel-customer-name').textContent = order.customer || 'N/A';
+    document.getElementById('panel-customer-email').textContent = order.email || 'N/A';
+
+    const phoneSection = document.getElementById('panel-phone-section');
+    const phoneEl = document.getElementById('panel-customer-phone');
+    if (order.phone || order.shippingAddress?.phone || order.billingAddress?.phone) {
+      phoneSection.style.display = 'block';
+      phoneEl.textContent = order.phone || order.shippingAddress?.phone || order.billingAddress?.phone;
+    } else {
+      phoneSection.style.display = 'none';
+    }
+
+    // Billing address
+    const billingSection = document.getElementById('panel-billing-section');
+    const billingEl = document.getElementById('panel-billing-address');
+    if (order.billingAddress) {
+      billingSection.style.display = 'block';
+      billingEl.innerHTML = formatAddress(order.billingAddress);
+    } else {
+      billingSection.style.display = 'none';
+    }
+
+    // Shipping address
+    const shippingSection = document.getElementById('panel-shipping-section');
+    const shippingEl = document.getElementById('panel-shipping-address');
+    if (order.shippingAddress) {
+      shippingSection.style.display = 'block';
+      shippingEl.innerHTML = formatAddress(order.shippingAddress);
+    } else {
+      shippingSection.style.display = 'none';
+    }
+
+    // Scroll to top of panel
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function hideOrderDetails() {
+    const container = document.getElementById('orders-container');
+    const panel = document.getElementById('order-details-panel');
+
+    panel.style.display = 'none';
+    container.style.display = 'block';
+  }
+
+  function formatAddress(addr) {
+    if (!addr) return '';
+    const parts = [
+      addr.name,
+      addr.company,
+      addr.address1,
+      addr.address2,
+      `${addr.city || ''}${addr.city && addr.province ? ', ' : ''}${addr.province || ''} ${addr.zip || ''}`.trim(),
+      addr.country,
+      addr.phone ? `Phone: ${addr.phone}` : ''
+    ].filter(part => part && part.trim());
+    return parts.map(p => escapeHtml(p)).join('<br>');
+  }
+
+  function renderOrdersTable(orders) {
+    const tableBody = document.getElementById('orders-table-body');
+    tableBody.innerHTML = '';
+
+    if (orders.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #666;">No orders match your filters</td></tr>';
+      return;
+    }
+
+    orders.forEach((order) => {
+      // Find the original index in ordersData for the detail view
+      const originalIndex = ordersData.findIndex(o => o.orderName === order.orderName);
+      const row = document.createElement('tr');
+
+      row.innerHTML = `
+        <td><a href="#" class="order-link" data-order-index="${originalIndex}"><strong>${escapeHtml(order.orderName || order.orderNumber)}</strong></a></td>
+        <td>${escapeHtml(order.customer || 'N/A')}</td>
+        <td>${escapeHtml(order.email || 'N/A')}</td>
+        <td>${formatDate(order.date)}</td>
+        <td>${order.currency || ''} ${formatMoney(order.total)}</td>
+        <td><span class="status-badge status-${normalizeStatus(order.fulfillment)}">${escapeHtml(getStatusDisplay(order.fulfillment))}</span></td>
+        <td>${renderTrackingNumbers(order.trackingNumbers, order.orderName)}</td>
+      `;
+
+      tableBody.appendChild(row);
+    });
+
+    // Add click handlers for order links
+    document.querySelectorAll('.order-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const orderIndex = parseInt(e.currentTarget.dataset.orderIndex);
+        showOrderDetails(orderIndex);
+      });
+    });
+
+    // Add click handlers for tracking more buttons
+    addTrackingButtonHandlers();
+  }
+
+  async function loadOrders() {
+    const customerId = {{ customer.id | json }};
+    const isExtendedManager = {{ is_extended_manager | default: false | json }};
+    const loadingEl = document.getElementById('orders-loading');
+    const errorEl = document.getElementById('orders-error');
+    const containerEl = document.getElementById('orders-container');
+    const emptyEl = document.getElementById('orders-empty');
+    const tableBody = document.getElementById('orders-table-body');
+
+    try {
+      loadingEl.style.display = 'block';
+      errorEl.style.display = 'none';
+      containerEl.style.display = 'none';
+      emptyEl.style.display = 'none';
+
+      // Extended managers get all GFS - USCIS orders
+      const apiUrl = isExtendedManager
+        ? `${API_ENDPOINT}?customerId=${customerId}&extended=true`
+        : `${API_ENDPOINT}?customerId=${customerId}`;
+      const response = await fetch(apiUrl);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      loadingEl.style.display = 'none';
+
+      if (data.error) {
+        errorEl.style.display = 'block';
+        document.getElementById('orders-error-message').textContent = data.error;
+        return;
+      }
+
+      if (!data.orders || data.orders.length === 0) {
+        emptyEl.style.display = 'block';
+        return;
+      }
+
+      document.getElementById('company-name').textContent = data.companyTag || 'N/A';
+      document.getElementById('total-orders').textContent = data.orderCount || 0;
+
+      ordersData = data.orders;
+      filteredOrdersData = data.orders;
+
+      renderOrdersTable(filteredOrdersData);
+      updateOrderFilterCount();
+
+      containerEl.style.display = 'block';
+
+    } catch (error) {
+      console.error('Error loading orders:', error);
+      loadingEl.style.display = 'none';
+      errorEl.style.display = 'block';
+      document.getElementById('orders-error-message').textContent =
+        'Failed to load orders. Please check that your API endpoint is configured correctly.';
+    }
+  }
+
+  function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+
+  function formatDateTime(dateString) {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+  }
+
+  function formatMoney(amount) {
+    if (!amount) return '0.00';
+    return parseFloat(amount).toFixed(2);
+  }
+
+  function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function renderTrackingNumbers(trackingNumbers, orderName) {
+    if (!trackingNumbers || trackingNumbers.length === 0) {
+      return 'N/A';
+    }
+
+    const firstTracking = trackingNumbers[0];
+    const trackingLink = `<a href="https://www.ups.com/track?tracknum=${encodeURIComponent(firstTracking)}" target="_blank" rel="noopener noreferrer" class="tracking-link">${escapeHtml(firstTracking)}</a>`;
+
+    if (trackingNumbers.length === 1) {
+      return trackingLink;
+    }
+
+    // Multiple tracking numbers - show first + plus button
+    const additionalCount = trackingNumbers.length - 1;
+    return `
+      <span class="tracking-cell">
+        ${trackingLink}
+        <button class="tracking-more-btn" data-tracking='${JSON.stringify(trackingNumbers)}' data-order-name="${escapeHtml(orderName)}" title="View all ${trackingNumbers.length} tracking numbers">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="16"></line>
+            <line x1="8" y1="12" x2="16" y2="12"></line>
+          </svg>
+          <span class="tracking-more-count">+${additionalCount}</span>
+        </button>
+      </span>
+    `;
+  }
+
+  function showTrackingModal(trackingNumbers, orderName) {
+    const modal = document.getElementById('tracking-modal');
+    const orderNameEl = document.getElementById('tracking-modal-order-name');
+    const listEl = document.getElementById('tracking-modal-list');
+
+    orderNameEl.textContent = `Order: ${orderName}`;
+    listEl.innerHTML = trackingNumbers.map((tracking, index) => `
+      <li>
+        <span class="tracking-modal__number">${index + 1}.</span>
+        <a href="https://www.ups.com/track?tracknum=${encodeURIComponent(tracking)}" target="_blank" rel="noopener noreferrer" class="tracking-link">${escapeHtml(tracking)}</a>
+      </li>
+    `).join('');
+
+    modal.style.display = 'flex';
+  }
+
+  function hideTrackingModal() {
+    document.getElementById('tracking-modal').style.display = 'none';
+  }
+
+  function initializeTrackingModal() {
+    const modal = document.getElementById('tracking-modal');
+    const closeBtn = document.getElementById('close-tracking-modal');
+
+    closeBtn.addEventListener('click', hideTrackingModal);
+
+    // Close when clicking outside
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        hideTrackingModal();
+      }
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal.style.display === 'flex') {
+        hideTrackingModal();
+      }
+    });
+  }
+
+  function addTrackingButtonHandlers() {
+    document.querySelectorAll('.tracking-more-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const trackingNumbers = JSON.parse(e.currentTarget.dataset.tracking);
+        const orderName = e.currentTarget.dataset.orderName;
+        showTrackingModal(trackingNumbers, orderName);
+      });
+    });
+  }
+</script>
+
+<style>
+  /* Dashboard Filters */
+  .dashboard-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f8f8;
+    border-radius: 4px;
+  }
+
+  .dashboard-filters__search {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .dashboard-filters__input {
+    width: 100%;
+    padding: 10px 12px 10px 40px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+  }
+
+  .dashboard-filters__input:focus {
+    outline: none;
+    border-color: #2563eb;
+  }
+
+  .dashboard-filters__search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    pointer-events: none;
+  }
+
+  .dashboard-filters__dropdowns {
+    display: flex;
+    gap: 10px;
+  }
+
+  .dashboard-filters__select {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background: #fff;
+    cursor: pointer;
+    min-width: 140px;
+  }
+
+  .dashboard-filters__select:focus {
+    outline: none;
+    border-color: #2563eb;
+  }
+
+  .dashboard-filters__results {
+    width: 100%;
+    font-size: 13px;
+    color: #666;
+    margin-top: 5px;
+  }
+
+  @media (max-width: 768px) {
+    .dashboard-filters {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .dashboard-filters__search {
+      width: 100%;
+    }
+
+    .dashboard-filters__dropdowns {
+      flex-direction: column;
+      width: 100%;
+    }
+
+    .dashboard-filters__select {
+      width: 100%;
+    }
+  }
+
+  /* Order Link Styles */
+  .order-link {
+    color: #2563eb;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .order-link:hover {
+    text-decoration: underline;
+    color: #1d4ed8;
+  }
+
+  /* Tracking Link Styles */
+  .tracking-link {
+    color: #2563eb;
+    text-decoration: none;
+  }
+
+  .tracking-link:hover {
+    text-decoration: underline;
+    color: #1d4ed8;
+  }
+
+  /* Tracking Cell with Multiple Numbers */
+  .tracking-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tracking-more-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border: 1px solid #2563eb;
+    border-radius: 20px;
+    background: #eff6ff;
+    color: #2563eb;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .tracking-more-btn:hover {
+    background: #2563eb;
+    color: #fff;
+  }
+
+  .tracking-more-btn svg {
+    flex-shrink: 0;
+  }
+
+  .tracking-more-count {
+    font-weight: 600;
+  }
+
+  /* Tracking Modal */
+  .tracking-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+  }
+
+  .tracking-modal__content {
+    background-color: white;
+    padding: 0;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .tracking-modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid #eee;
+  }
+
+  .tracking-modal__header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .tracking-modal__close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #999;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+    line-height: 1;
+  }
+
+  .tracking-modal__close:hover {
+    color: #333;
+  }
+
+  .tracking-modal__body {
+    padding: 20px 24px;
+    overflow-y: auto;
+    max-height: calc(80vh - 80px);
+  }
+
+  .tracking-modal__order-name {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+  }
+
+  .tracking-modal__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .tracking-modal__list li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .tracking-modal__list li:last-child {
+    border-bottom: none;
+  }
+
+  .tracking-modal__number {
+    color: #999;
+    font-size: 14px;
+    min-width: 24px;
+  }
+
+  .tracking-modal__list .tracking-link {
+    font-size: 14px;
+    word-break: break-all;
+  }
+
+  /* Order Details Panel */
+  .order-details-panel {
+    background: #fff;
+    padding: 0;
+  }
+
+  .order-details-panel__header {
+    margin-bottom: 20px;
+    padding-top: 30px;
+  }
+
+  .order-details-panel__header .button {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    font-size: 14px;
+    border: 1px solid #ddd;
+    background: #fff;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  .order-details-panel__header .button:hover {
+    background: #f5f5f5;
+    border-color: #ccc;
+  }
+
+  .order-details-panel__title {
+    margin-bottom: 20px;
+  }
+
+  .order-details-panel__title h1 {
+    margin: 0 0 5px 0;
+  }
+
+  .order-details-panel__title .text--subdued {
+    color: #666;
+    font-size: 14px;
+  }
+
+  /* Fulfillment Banner */
+  .banner {
+    display: flex;
+    align-items: flex-start;
+    padding: 15px;
+    border-radius: 4px;
+    gap: 12px;
+  }
+
+  .banner--success {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+  }
+
+  .banner__ribbon {
+    flex-shrink: 0;
+    color: #059669;
+  }
+
+  .banner__content {
+    margin: 0;
+    font-size: 14px;
+    color: #065f46;
+  }
+
+  .banner__content a {
+    color: #2563eb;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .banner__content a:hover {
+    text-decoration: underline;
+    color: #1d4ed8;
+  }
+
+  /* Line Item Table */
+  .order-details-panel__items {
+    margin-bottom: 30px;
+  }
+
+  .line-item-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .line-item-table th {
+    padding: 12px 10px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+  }
+
+  .line-item-table td {
+    padding: 16px 10px;
+    vertical-align: top;
+    border-bottom: 1px solid #eee;
+  }
+
+  .line-item-table__footer td {
+    padding: 8px 10px;
+    border-bottom: none;
+  }
+
+  .line-item-table__footer tr:last-child td {
+    padding-top: 12px;
+    border-top: 1px solid #ddd;
+  }
+
+  .line-item {
+    background: #fff;
+  }
+
+  .line-item__content-wrapper {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+  }
+
+  .line-item__image-wrapper {
+    flex-shrink: 0;
+    width: 80px;
+    height: 80px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #f5f5f5;
+  }
+
+  .line-item__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .line-item__image-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f0f0f0;
+    color: #999;
+  }
+
+  .line-item__info {
+    flex: 1;
+  }
+
+  .product-item-meta__title {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+
+  .product-item-meta__property {
+    display: block;
+    margin-top: 2px;
+  }
+
+  .price-list {
+    margin-top: 8px;
+  }
+
+  .text--center {
+    text-align: center;
+  }
+
+  .text--right {
+    text-align: right;
+  }
+
+  .text--subdued {
+    color: #666;
+  }
+
+  .text--xsmall {
+    font-size: 12px;
+  }
+
+  .text--small {
+    font-size: 14px;
+  }
+
+  .text--strong {
+    font-weight: 600;
+  }
+
+  /* Contact Info */
+  .order-details-panel__contact {
+    margin-bottom: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+  }
+
+  .order-details-panel__contact h2 {
+    margin: 0 0 15px 0;
+  }
+
+  .order-details-panel__contact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+  }
+
+  .order-details-panel__contact-item .heading--small {
+    display: block;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #666;
+    margin-bottom: 5px;
+  }
+
+  .order-details-panel__contact-item p {
+    margin: 0;
+    font-size: 14px;
+  }
+
+  /* Addresses */
+  .order-details-panel__addresses {
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+  }
+
+  .order-details-panel__addresses h2 {
+    margin: 0 0 15px 0;
+  }
+
+  .order-details-panel__addresses-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 30px;
+  }
+
+  .order-details-panel__address .heading--small {
+    display: block;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #666;
+    margin-bottom: 8px;
+  }
+
+  .order-details-panel__address div {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* Order Fulfillment Status Badges */
+  .status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .status-fulfilled {
+    background-color: #dcfce7;
+    color: #166534;
+  }
+
+  .status-partial {
+    background-color: #fef9c3;
+    color: #854d0e;
+  }
+
+  .status-unfulfilled {
+    background-color: #fee2e2;
+    color: #991b1b;
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .line-item__content-wrapper {
+      flex-direction: column;
+    }
+
+    .line-item__image-wrapper {
+      width: 60px;
+      height: 60px;
+    }
+
+    .line-item-table th:nth-child(2),
+    .line-item-table td:nth-child(2) {
+      display: none;
+    }
+
+    .order-details-panel__contact-grid,
+    .order-details-panel__addresses-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

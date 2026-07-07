@@ -1,0 +1,1241 @@
+{%- assign collection_sort_by = collection.sort_by | default: collection.default_sort_by -%}
+{%- assign active_filters_count = 0 -%}
+
+{%- for filter in collection.filters -%}
+  {%- if filter.type == 'list' -%}
+    {%- assign active_filters_count = active_filters_count | plus: filter.active_values.size -%}
+  {%- elsif filter.type == 'price_range' and filter.min_value.value or filter.max_value.value -%}
+    {%- assign active_filters_count = active_filters_count | plus: 1 -%}
+  {%- endif -%}
+{%- endfor -%}
+
+<style>
+  #shopify-section-{{ section.id }} {
+    --section-products-per-row: {{ section.settings.mobile_products_per_row | times: 1 }};
+  }
+
+  @media screen and (min-width: 741px) {
+    #shopify-section-{{ section.id }} {
+      {%- assign remainder_for_two = section.settings.products_per_page | modulo: 2 -%}
+      {%- assign remainder_for_desktop_count = section.settings.products_per_page | modulo: section.settings.desktop_products_per_row -%}
+
+      --section-products-per-row: {% if remainder_for_two == 0 and remainder_for_desktop_count == 0 %}2{% else %}3{% endif %};
+    }
+  }
+
+  {%- if section.settings.filter_position == 'drawer' -%}
+    @media screen and (min-width: 1200px) {
+      #shopify-section-{{ section.id }} {
+        --section-products-per-row: {{ section.settings.desktop_products_per_row }};
+      }
+    }
+  {%- else -%}
+    @media screen and (min-width: 1400px) {
+      #shopify-section-{{ section.id }} {
+        --section-products-per-row: {{ section.settings.desktop_products_per_row }};
+      }
+    }
+  {%- endif -%}
+
+  {%- for block in section.blocks -%}
+    #block-{{ section.id }}-{{ block.id }} {
+      --heading-color: {{ block.settings.text_color.red }}, {{ block.settings.text_color.green }}, {{ block.settings.text_color.blue }};
+      --text-color: {{ block.settings.text_color.red }}, {{ block.settings.text_color.green }}, {{ block.settings.text_color.blue }};
+      --section-block-background: {{ block.settings.background.red }}, {{ block.settings.background.green }}, {{ block.settings.background.blue }};
+      --primary-button-background: {{ block.settings.button_background.red }}, {{ block.settings.button_background.green }}, {{ block.settings.button_background.blue }};
+      --primary-button-text-color: {{ block.settings.button_text_color.red }}, {{ block.settings.button_text_color.green }}, {{ block.settings.button_text_color.blue }};
+
+      {%- assign text_position = block.settings.text_position | split: '_' | first -%}
+
+      {%- case text_position -%}
+        {%- when 'top' -%}
+          {%- assign section_items_alignment = 'flex-start' -%}
+        {%- when 'middle' -%}
+          {%- assign section_items_alignment = 'center' -%}
+        {%- when 'bottom' -%}
+          {%- assign section_items_alignment = 'flex-end' -%}
+      {%- endcase -%}
+
+      --section-blocks-alignment: {{ section_items_alignment }};
+    }
+  {%- endfor -%}
+
+  {%- if section.settings.show_filters and collection.filters != empty and collection.products_count > 0 -%}
+    .mobile-toolbar__item--filters {
+      display: flex !important;
+    }
+  {%- endif -%}
+
+  {%- if section.settings.show_sort_by and collection.products_count > 0 -%}
+    .mobile-toolbar__item--sort {
+      display: flex !important;
+    }
+  {%- endif -%}
+
+  {%- if section.settings.show_sort_by or section.settings.show_filters and collection.filters != empty -%}
+    @media screen and (max-width: 999px) {
+      :root {
+        --anchor-offset: 60px;
+      }
+    }
+  {%- endif -%}
+
+  /* Bulk Order Styles */
+  .bulk-order-header {
+    background: linear-gradient(135deg, #192674 0%, #2a3a8f 100%);
+    color: white;
+    padding: 30px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+  }
+
+  .bulk-order-header h2 {
+    margin: 0 0 10px 0;
+    font-size: 24px;
+  }
+
+  .bulk-order-header p {
+    margin: 0 0 20px 0;
+    opacity: 0.9;
+  }
+
+  .bulk-order-location-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .bulk-order-location__label {
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.9;
+    white-space: nowrap;
+  }
+
+  .bulk-order-location__select-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .bulk-order-location__select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-radius: 6px;
+    padding: 10px 40px 10px 15px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 220px;
+  }
+
+  .bulk-order-location__select:hover {
+    background: rgba(255,255,255,0.25);
+    border-color: rgba(255,255,255,0.6);
+  }
+
+  .bulk-order-location__select:focus {
+    outline: none;
+    background: rgba(255,255,255,0.25);
+    border-color: white;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.3);
+  }
+
+  .bulk-order-location__select option {
+    background: #192674;
+    color: white;
+  }
+
+  .bulk-order-location__chevron {
+    position: absolute;
+    right: 12px;
+    pointer-events: none;
+  }
+
+  .bulk-order-input-wrapper {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .bulk-order-input {
+    flex: 1;
+    min-width: 250px;
+    padding: 15px 20px;
+    font-size: 16px;
+    border: none;
+    border-radius: 6px;
+    background: white;
+    color: #333;
+  }
+
+  .bulk-order-input::placeholder {
+    color: #999;
+  }
+
+  .bulk-order-input:focus {
+    outline: 3px solid rgba(255,255,255,0.5);
+    color: #333;
+  }
+
+  .bulk-order-btn {
+    padding: 15px 30px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .bulk-order-btn--primary {
+    background: #fff;
+    color: #192674;
+  }
+
+  .bulk-order-btn--primary:hover {
+    background: #f0f0f0;
+  }
+
+  .bulk-order-btn--secondary {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: 2px solid white;
+  }
+
+  .bulk-order-btn--secondary:hover {
+    background: rgba(255,255,255,0.3);
+  }
+
+  .bulk-order-active-person {
+    display: none;
+    margin-top: 20px;
+    padding: 15px 20px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 6px;
+    align-items: center;
+    gap: 15px;
+  }
+
+  .bulk-order-active-person.active {
+    display: flex;
+  }
+
+  .bulk-order-active-person__label {
+    font-size: 14px;
+    opacity: 0.8;
+  }
+
+  .bulk-order-active-person__name {
+    font-size: 18px;
+    font-weight: 600;
+    flex: 1;
+  }
+
+  .bulk-order-active-person__clear {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 5px;
+    opacity: 0.8;
+  }
+
+  .bulk-order-active-person__clear:hover {
+    opacity: 1;
+  }
+
+  /* Toast Notification */
+  .bulk-order-toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #333;
+    color: white;
+    padding: 15px 25px;
+    border-radius: 8px;
+    z-index: 300;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+  }
+
+  .bulk-order-toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Person Toggle Chips */
+  .bulk-order-people-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 15px;
+  }
+
+  .bulk-order-people-list:empty {
+    display: none;
+  }
+
+  .bulk-order-person-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.75);
+    user-select: none;
+  }
+
+  .bulk-order-person-chip:hover {
+    background: rgba(255,255,255,0.2);
+    color: white;
+  }
+
+  .bulk-order-person-chip.active {
+    background: white;
+    color: #192674;
+    border-color: white;
+  }
+
+  .bulk-order-person-chip__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.15);
+    color: inherit;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0;
+    transition: background 0.2s;
+  }
+
+  .bulk-order-person-chip__remove:hover {
+    background: rgba(0,0,0,0.3);
+  }
+
+  .bulk-order-person-chip.active .bulk-order-person-chip__remove {
+    background: rgba(25,38,116,0.2);
+  }
+
+  .bulk-order-person-chip.active .bulk-order-person-chip__remove:hover {
+    background: rgba(25,38,116,0.35);
+  }
+
+  .bulk-order-person-chip__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    background: rgba(0,0,0,0.15);
+    color: inherit;
+  }
+
+  .bulk-order-person-chip.active .bulk-order-person-chip__count {
+    background: rgba(25,38,116,0.15);
+    color: #192674;
+  }
+
+  /* Bulk order product click override */
+  .product-item--bulk-order a[data-instant] {
+    cursor: pointer;
+  }
+
+  @media (max-width: 600px) {
+    .bulk-order-input-wrapper {
+      flex-direction: column;
+    }
+
+    .bulk-order-input {
+      width: 100%;
+    }
+
+    .bulk-order-btn {
+      width: 100%;
+    }
+  }
+</style>
+
+<section>
+  <div class="container">
+    <!-- Bulk Order Header -->
+    <div class="bulk-order-header">
+      <h2>{{ section.settings.bulk_order_title | default: 'Bulk Order for Multiple People' }}</h2>
+      <p>{{ section.settings.bulk_order_description | default: 'Enter a name to start adding items for that person. You can add items for multiple people and checkout all at once.' }}</p>
+
+      <div class="bulk-order-location-wrapper">
+        <label class="bulk-order-location__label" for="bulk-order-location">Collection</label>
+        <div class="bulk-order-location__select-wrapper">
+          <select id="bulk-order-location" class="bulk-order-location__select">
+            <option value="/collections/bls-class-a-uniforms" {% if collection.handle == 'bls-class-a-uniforms' %}selected{% endif %}>Class A Uniforms</option>
+            <option value="/collections/bls-standard-uniforms" {% if collection.handle == 'bls-standard-uniforms' %}selected{% endif %}>Standard Uniforms</option>
+          </select>
+          <svg class="bulk-order-location__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+      </div>
+
+      <div class="bulk-order-input-wrapper">
+        <input type="text" id="bulk-order-name-input" class="bulk-order-input" placeholder="Enter employee/person name..." autocomplete="off">
+        <button type="button" id="bulk-order-set-name" class="bulk-order-btn bulk-order-btn--primary">
+          Start Adding Items
+        </button>
+        <a href="/cart" class="bulk-order-btn bulk-order-btn--secondary" style="text-decoration: none; text-align: center;">
+          View Cart
+        </a>
+      </div>
+
+      <div id="bulk-order-people-list" class="bulk-order-people-list"></div>
+
+      <div id="bulk-order-active-person" class="bulk-order-active-person">
+        <span class="bulk-order-active-person__label">Adding items for:</span>
+        <span id="bulk-order-current-name" class="bulk-order-active-person__name"></span>
+        <button type="button" id="bulk-order-clear-person" class="bulk-order-active-person__clear" title="Clear selection">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <product-facet section-id="{{ section.id }}" class="product-facet">
+      {%- if section.settings.show_filters and collection.filters != empty -%}
+        {%- if section.settings.filter_position == 'always_visible' -%}
+          <div class="product-facet__aside">
+            <safe-sticky offset="30" class="product-facet__aside-inner">
+              <div class="product-facet__filters-header hidden-pocket">
+                <p class="heading {% if settings.heading_text_transform == 'uppercase' %}h6{% else %}h5{% endif %}">{{ 'collection.general.filters' | t }}</p>
+              </div>
+
+              {%- render 'facet-filters', filters: collection.filters, filters_position: section.settings.filter_position -%}
+            </safe-sticky>
+          </div>
+        {%- else -%}
+          {%- render 'facet-filters', filters: collection.filters, filters_position: section.settings.filter_position -%}
+        {%- endif -%}
+      {%- endif -%}
+
+      <div id="facet-main" class="product-facet__main anchor" role="region" aria-live="polite">
+        {%- if section.blocks.size > 0 -%}
+          {%- capture promotion_blocks -%}
+            <div class="promotion-block-list promotion-block-list--{{ section.settings.promotion_position }}">
+              {%- for block in section.blocks -%}
+                {%- capture block_content -%}
+                  {%- if block.settings.image != blank -%}
+                    {%- capture sizes_attribute -%}(max-width: 740px) calc(100vw - 12px * 2), calc(min(100vw, 1560px) / {{ section.blocks.size }} - 20px * {{ section.blocks.size | minus: 1 }}){%- endcapture -%}
+                    {{- block.settings.image | image_url: width: block.settings.image.width | image_tag: loading: 'lazy', sizes: sizes_attribute, widths: '200,300,400,500,600,700,800,900,1000,1100,1200,1300,1400,1500,1600', class: 'promotion-block__image' -}}
+                  {%- endif -%}
+
+                  <div class="promotion-block__content-wrapper text-container" style="{% if block.settings.text_position contains 'center' %}text-align: center{% elsif block.settings.text_position contains 'right' %}text-align: end{% endif %}">
+                    {%- if block.settings.subheading != blank -%}
+                      <p class="heading heading--small">{{ block.settings.subheading | escape }}</p>
+                    {%- endif -%}
+
+                    {%- if block.settings.title != blank -%}
+                      <p class="heading h4">{{ block.settings.title | escape | newline_to_br }}</p>
+                    {%- endif -%}
+
+                    {%- if block.settings.link_text != blank -%}
+                      {%- if block.settings.link_style == 'link' -%}
+                        <span class="heading heading--small link">{{ block.settings.link_text | escape }}</span>
+                      {%- else -%}
+                        <div class="button-wrapper">
+                          <span class="button button--small button--primary">{{ block.settings.link_text | escape }}</span>
+                        </div>
+                      {%- endif -%}
+                    {%- endif -%}
+                  </div>
+                {%- endcapture -%}
+
+                {%- if block.settings.link_url != blank -%}
+                  <a id="block-{{ section.id }}-{{ block.id }}" href="{{ block.settings.link_url }}" class="promotion-block promotion-block--{{ section.settings.promotion_height }} promotion-block--expand image-zoom" {{ block.shopify_attributes }}>
+                    {{- block_content -}}
+                  </a>
+                {%- else -%}
+                  <div id="block-{{ section.id }}-{{ block.id }}" class="promotion-block promotion-block--{{ section.settings.promotion_height }} promotion-block--expand image-zoom" {{ block.shopify_attributes }}>
+                    {{- block_content -}}
+                  </div>
+                {%- endif -%}
+              {%- endfor -%}
+            </div>
+          {%- endcapture -%}
+        {%- endif -%}
+
+        {%- if section.settings.promotion_position == 'top' -%}
+          {{- promotion_blocks -}}
+        {%- endif -%}
+
+        {%- if collection.products_count > 0 -%}
+          <div class="product-facet__meta-bar anchor">
+            {%- if section.settings.filter_position == 'drawer' and section.settings.show_filters and collection.filters != empty -%}
+              <button type="submit" is="toggle-button" class="product-facet__meta-bar-item product-facet__meta-bar-item--filter hidden-pocket" aria-controls="facet-filters" aria-expanded="false">
+                {%- render 'icon' with 'filters', inline: true -%} {{- 'collection.general.show_filters' | t -}} {% if active_filters_count > 0 %}<span class="product-facet__active-count bubble-count">{{ active_filters_count }}</span>{% endif %}
+              </button>
+            {%- endif -%}
+
+            <span class="product-facet__meta-bar-item product-facet__meta-bar-item--count" role="status">{{ 'collection.general.products_count' | t: count: collection.products_count }}</span>
+
+            {%- if section.settings.show_sort_by -%}
+              <div class="product-facet__meta-bar-item product-facet__meta-bar-item--sort">
+                <span class="product-facet__sort-by-title text--subdued hidden-pocket">{{ 'collection.general.sort_by' | t }}</span>
+
+                <div class="popover-container">
+                  {%- for option in collection.sort_options -%}
+                    {%- if option.value == collection_sort_by -%}
+                      {%- assign collection_sort_by_name = option.name -%}
+                      {%- break -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+
+                  <button type="button" is="toggle-button" class="popover-button hidden-pocket" aria-expanded="false" aria-controls="sort-by-popover">
+                    <span id="sort-by-selected-value" style="pointer-events: none">{{- collection_sort_by_name -}}</span>
+                    {%- render 'icon' with 'chevron', inline: true -%}
+                  </button>
+
+                  <sort-by-popover id="sort-by-popover" class="popover">
+                    <span class="popover__overlay"></span>
+
+                    <header class="popover__header">
+                      <span class="popover__title heading h6">{{- 'collection.general.sort_by' | t -}}</span>
+
+                      <button type="button" class="popover__close-button tap-area tap-area--large" data-action="close" title="{{ 'general.accessibility.close' | t | escape }}">
+                        {%- render 'icon' with 'close' -%}
+                      </button>
+                    </header>
+
+                    <div class="popover__content">
+                      <div class="popover__choice-list">
+                        {%- for sort_option in collection.sort_options -%}
+                          <label class="popover__choice-item">
+                            <input type="radio" data-bind-value="sort-by-selected-value" class="visually-hidden" {% if sort_option.value == collection_sort_by %}checked="checked"{% endif %} name="sort_by" value="{{ sort_option.value }}" title="{{ sort_option.name }}">
+                            <span class="popover__choice-label">{{ sort_option.name }}</span>
+                          </label>
+                        {%- endfor -%}
+                      </div>
+                    </div>
+                  </sort-by-popover>
+                </div>
+              </div>
+            {%- endif -%}
+          </div>
+
+          {%- if active_filters_count > 0 -%}
+            <div class="product-facet__active-list tag-list hidden-tablet-and-up">
+              {%- render 'facet-active-filters', filters: collection.filters -%}
+            </div>
+          {%- endif -%}
+
+          {%- paginate collection.products by section.settings.products_per_page -%}
+            <product-list {% if settings.stagger_products_apparition %}stagger-apparition{% endif %} class="product-facet__product-list product-list anchor">
+              {%- if section.settings.filter_position == 'always_visible' and section.settings.show_filters and collection.filters != empty -%}
+                {%- assign sidebar_width = 305 -%}
+              {% else %}
+                {%- assign sidebar_width = 0 -%}
+              {%- endif -%}
+
+              <div class="product-list__inner">
+                {%- assign desktop_number_of_products_minus_one = section.settings.desktop_products_per_row | minus: 1 -%}
+                {%- assign gap_width = 24.0 | divided_by: section.settings.desktop_products_per_row | times: desktop_number_of_products_minus_one -%}
+                {%- capture sizes_attribute -%}(max-width: 740px) calc({{ 100.0 | divided_by: section.settings.mobile_products_per_row | ceil }}vw - 24px), calc((min(100vw - 80px, 1520px) - {{ sidebar_width }}px) / {{ section.settings.desktop_products_per_row }} - {{ gap_width | ceil }}px){%- endcapture -%}
+
+                {%- for product in collection.products -%}
+                  {%- render 'product-item', product: product, collection: collection, sizes_attribute: sizes_attribute, reveal: settings.stagger_products_apparition, bulk_order_mode: true -%}
+                {%- endfor -%}
+              </div>
+            </product-list>
+
+            {%- render 'pagination', paginate: paginate, use_ajax: true -%}
+          {%- endpaginate -%}
+
+          {%- if section.settings.promotion_position == 'bottom' -%}
+            {{- promotion_blocks -}}
+          {%- endif -%}
+        {%- else -%}
+          <div class="empty-state">
+            {%- if collection.all_products_count == 0 -%}
+              <h3 class="heading h4">{{ 'collection.general.empty_title' | t }}</h3>
+              <p>{{ 'collection.general.empty_label' | t }}</p>
+
+              <div class="button-wrapper">
+                <a href="{{ routes.all_products_collection_url }}" class="button button--primary">{{ 'collection.general.empty_button' | t }}</a>
+              </div>
+            {%- else -%}
+              <h3 class="heading h4">{{ 'collection.general.no_results_title' | t }}</h3>
+              <p>{{ 'collection.general.no_results_label' | t }}</p>
+
+              <div class="button-wrapper">
+                <a href="{{ collection.url }}?sort_by={{ collection_sort_by }}" data-action="clear-filters" class="button button--primary">{{ 'collection.general.no_results_button' | t }}</a>
+              </div>
+            {%- endif -%}
+          </div>
+        {%- endif -%}
+      </div>
+    </product-facet>
+  </div>
+</section>
+
+<!-- Toast Notification -->
+<div id="bulk-order-toast" class="bulk-order-toast"></div>
+
+<script>
+  (function() {
+    // Prevent the theme's ProductForm from redirecting to /cart after add-to-cart.
+    // The global cart_type is "page" which causes a redirect; override to "message"
+    // so add-to-cart stays on this page and our toast notification handles feedback.
+    if (window.themeVariables && window.themeVariables.settings) {
+      window.themeVariables.settings.cartType = 'message';
+    }
+
+    // Bulk Order State - tracks current person name and person list across page navigations
+    const bulkOrderState = {
+      currentPerson: null,
+      personNames: []
+    };
+
+    // Load state from sessionStorage
+    function loadState() {
+      const savedPerson = sessionStorage.getItem('bulkOrderCurrentPerson');
+      if (savedPerson) {
+        bulkOrderState.currentPerson = savedPerson;
+      }
+      const savedNames = sessionStorage.getItem('bulkOrderPersonNames');
+      if (savedNames) {
+        try {
+          bulkOrderState.personNames = JSON.parse(savedNames);
+        } catch (e) {
+          bulkOrderState.personNames = [];
+        }
+      }
+      updateUI();
+      // Fetch cart counts to show item badges on person chips
+      fetchCartCounts();
+    }
+
+    // Save state to sessionStorage
+    function saveState() {
+      if (bulkOrderState.currentPerson) {
+        sessionStorage.setItem('bulkOrderCurrentPerson', bulkOrderState.currentPerson);
+      } else {
+        sessionStorage.removeItem('bulkOrderCurrentPerson');
+      }
+      sessionStorage.setItem('bulkOrderPersonNames', JSON.stringify(bulkOrderState.personNames));
+    }
+
+    // Cart item counts per person (populated by fetchCartCounts)
+    var cartCountsPerPerson = {};
+
+    // Fetch cart and count items per person name
+    function fetchCartCounts() {
+      return fetch('/cart.js')
+        .then(function(response) { return response.json(); })
+        .then(function(cart) {
+          var counts = {};
+          cart.items.forEach(function(item) {
+            if (item.properties && item.properties['Ordered For']) {
+              var person = item.properties['Ordered For'];
+              counts[person] = (counts[person] || 0) + item.quantity;
+            }
+          });
+          cartCountsPerPerson = counts;
+          renderPersonChips();
+        })
+        .catch(function(err) {
+          console.error('Error fetching cart counts:', err);
+        });
+    }
+
+    // Render person chips
+    function renderPersonChips() {
+      var container = document.getElementById('bulk-order-people-list');
+      if (!container) return;
+      container.innerHTML = '';
+
+      bulkOrderState.personNames.forEach(function(name) {
+        var chip = document.createElement('span');
+        chip.className = 'bulk-order-person-chip' + (name === bulkOrderState.currentPerson ? ' active' : '');
+
+        var nameSpan = document.createElement('span');
+        nameSpan.textContent = name;
+        chip.appendChild(nameSpan);
+
+        // Show item count badge if person has items in cart
+        var count = cartCountsPerPerson[name] || 0;
+        if (count > 0) {
+          var countBadge = document.createElement('span');
+          countBadge.className = 'bulk-order-person-chip__count';
+          countBadge.textContent = count;
+          countBadge.title = count + ' item' + (count !== 1 ? 's' : '') + ' in cart';
+          chip.appendChild(countBadge);
+        }
+
+        var removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'bulk-order-person-chip__remove';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.title = 'Remove ' + name;
+        removeBtn.setAttribute('data-person-name', name);
+        removeBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          removePerson(this.getAttribute('data-person-name'));
+        });
+        chip.appendChild(removeBtn);
+
+        chip.setAttribute('data-person-name', name);
+        chip.addEventListener('click', function() {
+          switchToPerson(this.getAttribute('data-person-name'));
+        });
+
+        container.appendChild(chip);
+      });
+    }
+
+    // Switch active person (by clicking a chip)
+    function switchToPerson(name) {
+      bulkOrderState.currentPerson = name;
+      saveState();
+      updateUI();
+      showToast('Now adding items for: ' + name);
+    }
+
+    // Remove a person from the list
+    function removePerson(name) {
+      bulkOrderState.personNames = bulkOrderState.personNames.filter(function(n) { return n !== name; });
+      if (bulkOrderState.currentPerson === name) {
+        bulkOrderState.currentPerson = bulkOrderState.personNames.length > 0 ? bulkOrderState.personNames[0] : null;
+      }
+      saveState();
+      updateUI();
+    }
+
+    // Update header UI
+    function updateUI() {
+      var activePerson = document.getElementById('bulk-order-active-person');
+      var currentName = document.getElementById('bulk-order-current-name');
+
+      if (bulkOrderState.currentPerson) {
+        activePerson.classList.add('active');
+        currentName.textContent = bulkOrderState.currentPerson;
+      } else {
+        activePerson.classList.remove('active');
+      }
+
+      renderPersonChips();
+    }
+
+    // Show toast notification
+    function showToast(message) {
+      const toast = document.getElementById('bulk-order-toast');
+      toast.textContent = message;
+      toast.classList.add('visible');
+      setTimeout(() => toast.classList.remove('visible'), 3000);
+    }
+
+    // Set current person
+    function setCurrentPerson(name) {
+      if (!name || !name.trim()) {
+        showToast('Please enter a name');
+        return;
+      }
+      var trimmed = name.trim();
+      // Add to personNames list if not already present
+      if (bulkOrderState.personNames.indexOf(trimmed) === -1) {
+        bulkOrderState.personNames.push(trimmed);
+      }
+      bulkOrderState.currentPerson = trimmed;
+      saveState();
+      updateUI();
+      showToast('Now adding items for: ' + bulkOrderState.currentPerson);
+      document.getElementById('bulk-order-name-input').value = '';
+    }
+
+    // Clear current person (deselect without removing from list)
+    function clearCurrentPerson() {
+      bulkOrderState.currentPerson = null;
+      saveState();
+      updateUI();
+    }
+
+    // Expose for external use
+    window.getBulkOrderPerson = function() {
+      return bulkOrderState.currentPerson;
+    };
+
+    // =====================================================
+    // FETCH INTERCEPTOR
+    // Intercepts all /cart/add.js requests to:
+    // 1. Block add-to-cart if no person name is entered
+    // 2. Inject "Ordered For" line item property with the person's name
+    // =====================================================
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options) {
+      // Only intercept POST requests to /cart/add.js
+      if (typeof url === 'string' && url.includes('/cart/add.js') && options && options.method && options.method.toUpperCase() === 'POST') {
+
+        // Block if no person selected
+        if (!bulkOrderState.currentPerson) {
+          showToast('Please enter a person\'s name before adding items');
+          document.getElementById('bulk-order-name-input').focus();
+          // Return a fake failed response to prevent the add
+          return Promise.resolve(new Response(JSON.stringify({ message: 'No person selected' }), {
+            status: 422,
+            headers: { 'Content-Type': 'application/json' }
+          }));
+        }
+
+        // Inject "Ordered For" property into the request body
+        try {
+          if (options.headers && options.headers['Content-Type'] === 'application/json') {
+            // JSON body (used by AJAX API)
+            var body = JSON.parse(options.body);
+
+            if (body.items) {
+              // Multiple items format: { items: [...] }
+              body.items.forEach(function(item) {
+                if (!item.properties) item.properties = {};
+                item.properties['Ordered For'] = bulkOrderState.currentPerson;
+              });
+            } else {
+              // Single item format: { id: ..., quantity: ... }
+              if (!body.properties) body.properties = {};
+              body.properties['Ordered For'] = bulkOrderState.currentPerson;
+            }
+
+            options.body = JSON.stringify(body);
+          } else if (options.body instanceof FormData) {
+            // FormData body (used by product forms)
+            options.body.append('properties[Ordered For]', bulkOrderState.currentPerson);
+          } else if (typeof options.body === 'string' && options.body.includes('=')) {
+            // URL-encoded body
+            options.body += '&' + encodeURIComponent('properties[Ordered For]') + '=' + encodeURIComponent(bulkOrderState.currentPerson);
+          }
+        } catch (e) {
+          console.error('Bulk order: error injecting person name', e);
+        }
+
+        // Show confirmation toast after the request completes and refresh counts
+        var personName = bulkOrderState.currentPerson;
+        return originalFetch.call(this, url, options).then(function(response) {
+          if (response.ok) {
+            showToast('Added to cart for ' + personName);
+            fetchCartCounts();
+          }
+          return response;
+        });
+      }
+
+      // All other requests pass through unchanged
+      return originalFetch.apply(this, arguments);
+    };
+
+    // =====================================================
+    // FORM SUBMIT INTERCEPTOR
+    // Catches native form submissions (non-AJAX) to /cart/add
+    // and converts them to AJAX with the person's name injected
+    // =====================================================
+    document.addEventListener('submit', function(e) {
+      var form = e.target;
+      if (!form || !form.action) return;
+
+      // Check if this is a cart add form
+      if (form.action.includes('/cart/add')) {
+        // Block if no person selected
+        if (!bulkOrderState.currentPerson) {
+          e.preventDefault();
+          showToast('Please enter a person\'s name before adding items');
+          document.getElementById('bulk-order-name-input').focus();
+          return;
+        }
+
+        // Inject the person name as a hidden field
+        var existingField = form.querySelector('input[name="properties[Ordered For]"]');
+        if (!existingField) {
+          var hiddenInput = document.createElement('input');
+          hiddenInput.type = 'hidden';
+          hiddenInput.name = 'properties[Ordered For]';
+          hiddenInput.value = bulkOrderState.currentPerson;
+          form.appendChild(hiddenInput);
+        } else {
+          existingField.value = bulkOrderState.currentPerson;
+        }
+      }
+    }, true); // Use capture phase to run before other handlers
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+      loadState();
+
+      // Location dropdown - navigate to selected collection
+      var locationSelect = document.getElementById('bulk-order-location');
+      if (locationSelect) {
+        locationSelect.addEventListener('change', function() {
+          window.location.href = this.value;
+        });
+      }
+
+      // Set name button
+      document.getElementById('bulk-order-set-name').addEventListener('click', function() {
+        var input = document.getElementById('bulk-order-name-input');
+        setCurrentPerson(input.value);
+      });
+
+      // Enter key on input
+      document.getElementById('bulk-order-name-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          setCurrentPerson(this.value);
+        }
+      });
+
+      // Clear person button
+      document.getElementById('bulk-order-clear-person').addEventListener('click', clearCurrentPerson);
+
+      // =====================================================
+      // CLICK INTERCEPTOR
+      // Prevents product link navigation in bulk order mode.
+      // Instead opens quick-buy drawer/popover (multi-variant)
+      // or submits the product form (single-variant).
+      // =====================================================
+      document.addEventListener('click', function(e) {
+        var link = e.target.closest('.product-item--bulk-order a[data-instant]');
+        if (!link) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        var productItem = link.closest('.product-item--bulk-order');
+        if (!productItem) return;
+
+        var hasVariants = productItem.getAttribute('data-bulk-has-variants') === 'true';
+
+        if (hasVariants) {
+          // Multi-variant: find and click the quick-buy toggle button to open drawer/popover
+          // Prefer the desktop drawer toggle, fall back to popover toggle
+          var toggleBtn = productItem.querySelector('button[is="toggle-button"][aria-controls*="-drawer"]')
+            || productItem.querySelector('button[is="toggle-button"][aria-controls*="-popover"]');
+          if (toggleBtn) {
+            toggleBtn.click();
+          }
+        } else {
+          // Single-variant: find the product form and submit it
+          var form = productItem.querySelector('product-form, form[action*="/cart/add"]');
+          if (form) {
+            // If it's a custom element wrapping a form, find the inner form
+            var actualForm = form.tagName === 'FORM' ? form : form.querySelector('form');
+            if (actualForm) {
+              // Trigger submit via the submit button to ensure theme JS hooks fire
+              var submitBtn = actualForm.querySelector('button[type="submit"]');
+              if (submitBtn) {
+                submitBtn.click();
+              } else {
+                actualForm.requestSubmit();
+              }
+            }
+          }
+        }
+      }, true); // capture phase to intercept before instant-click
+    });
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Bulk Order Collection",
+  "class": "shopify-section--main-collection-bulk-order",
+  "max_blocks": 2,
+  "blocks": [
+    {
+      "type": "image",
+      "name": "Promotion block",
+      "settings": [
+        {
+          "type": "image_picker",
+          "id": "image",
+          "label": "Image",
+          "info": "1200 x 600px .jpg recommended (if two blocks), 2400 x 800px .jpg recommended (if one block)"
+        },
+        {
+          "type": "text",
+          "id": "subheading",
+          "label": "Subheading",
+          "default": "Your subheading"
+        },
+        {
+          "type": "text",
+          "id": "title",
+          "label": "Heading",
+          "default": "Your heading"
+        },
+        {
+          "type": "text",
+          "id": "link_text",
+          "label": "Link text"
+        },
+        {
+          "type": "url",
+          "id": "link_url",
+          "label": "Link URL"
+        },
+        {
+          "type": "select",
+          "id": "link_style",
+          "label": "Link style",
+          "options": [
+            {
+              "value": "link",
+              "label": "Link"
+            },
+            {
+              "value": "button",
+              "label": "Button"
+            }
+          ],
+          "default": "link"
+        },
+        {
+          "type": "select",
+          "id": "text_position",
+          "label": "Text position",
+          "options": [
+            {
+              "value": "top_left",
+              "label": "Top left"
+            },
+            {
+              "value": "top_center",
+              "label": "Top center"
+            },
+            {
+              "value": "top_right",
+              "label": "Top right"
+            },
+            {
+              "value": "middle_left",
+              "label": "Middle left"
+            },
+            {
+              "value": "middle_center",
+              "label": "Middle center"
+            },
+            {
+              "value": "middle_right",
+              "label": "Middle right"
+            },
+            {
+              "value": "bottom_left",
+              "label": "Bottom left"
+            },
+            {
+              "value": "bottom_center",
+              "label": "Bottom center"
+            },
+            {
+              "value": "bottom_right",
+              "label": "Bottom right"
+            }
+          ],
+          "default": "middle_left"
+        },
+        {
+          "type": "color",
+          "id": "background",
+          "label": "Background",
+          "default": "#f7f8fd"
+        },
+        {
+          "type": "color",
+          "id": "text_color",
+          "label": "Text color",
+          "default": "#1e316a"
+        },
+        {
+          "type": "color",
+          "id": "button_background",
+          "label": "Button background",
+          "default": "#ffffff"
+        },
+        {
+          "type": "color",
+          "id": "button_text_color",
+          "label": "Button text color",
+          "default": "#1e316a"
+        }
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "type": "header",
+      "content": "Bulk Order Settings"
+    },
+    {
+      "type": "text",
+      "id": "bulk_order_title",
+      "label": "Header title",
+      "default": "Bulk Order for Multiple People"
+    },
+    {
+      "type": "textarea",
+      "id": "bulk_order_description",
+      "label": "Header description",
+      "default": "Enter a name to start adding items for that person. You can add items for multiple people and checkout all at once."
+    },
+    {
+      "type": "header",
+      "content": "Collection Settings"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_sort_by",
+      "label": "Show sort by",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "products_per_page",
+      "label": "Products per page",
+      "min": 8,
+      "max": 50,
+      "step": 1,
+      "default": 24
+    },
+    {
+      "type": "select",
+      "id": "mobile_products_per_row",
+      "label": "Products per row (mobile)",
+      "options": [
+        {
+          "value": "1",
+          "label": "1"
+        },
+        {
+          "value": "2",
+          "label": "2"
+        }
+      ],
+      "default": "2"
+    },
+    {
+      "type": "range",
+      "min": 3,
+      "max": 5,
+      "id": "desktop_products_per_row",
+      "label": "Products per row (desktop)",
+      "default": 4
+    },
+    {
+      "type": "header",
+      "content": "Filters"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_filters",
+      "label": "Show filters",
+      "info": "[Customize filters](/admin/menus)",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_filter_group_name",
+      "label": "Show group name",
+      "info": "Group name will be shown inside selected filters.",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "show_color_swatch",
+      "label": "Show filter color swatch",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "open_first_filter_group",
+      "label": "Open first group by default",
+      "default": false
+    },
+    {
+      "type": "select",
+      "id": "filter_position",
+      "label": "Position",
+      "options": [
+        {
+          "value": "always_visible",
+          "label": "Always visible"
+        },
+        {
+          "value": "drawer",
+          "label": "Drawer"
+        }
+      ],
+      "default": "always_visible"
+    },
+    {
+      "type": "header",
+      "content": "Promotion blocks"
+    },
+    {
+      "type": "select",
+      "id": "promotion_position",
+      "label": "Position",
+      "options": [
+        {
+          "value": "top",
+          "label": "Top"
+        },
+        {
+          "value": "bottom",
+          "label": "Bottom"
+        }
+      ],
+      "default": "top"
+    },
+    {
+      "type": "select",
+      "id": "promotion_height",
+      "label": "Block height",
+      "options": [
+        {
+          "value": "small",
+          "label": "Small"
+        },
+        {
+          "value": "medium",
+          "label": "Medium"
+        },
+        {
+          "value": "large",
+          "label": "Large"
+        }
+      ],
+      "default": "small"
+    }
+  ]
+}
+{% endschema %}
