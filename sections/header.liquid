@@ -557,6 +557,25 @@ SEARCH DRAWER - Only for logged-in users
 </script>
 
 {%- comment -%}
+  Akima Store mode: point the logo at the Akima Store collection.
+
+  The logo is server-rendered with href="{{ routes.root_url }}" (the site root),
+  but the root route now ends the Akima session (see snippets/akima-store-mode.liquid).
+  So while a gated visitor is in Akima Store mode, rewrite the logo link to the
+  Akima Store collection ("home") so clicking it keeps them in the store instead
+  of killing the session. Client-side only — see notes in sections/password-gate.liquid.
+{%- endcomment -%}
+<script>
+  (function () {
+    try {
+      if (sessionStorage.getItem('akima-store-gate') !== 'granted') return;
+      var logoLink = document.querySelector('.header__logo-link');
+      if (logoLink) logoLink.setAttribute('href', '/collections/akima-store');
+    } catch (e) {}
+  })();
+</script>
+
+{%- comment -%}
   Akima Store mode: "Exit store" button handler (only present on the akima-store
   collection page). Clears the gate session flag and the saved order mode, removes
   the cart's Akima Store marker, then returns the visitor to the password gate.
