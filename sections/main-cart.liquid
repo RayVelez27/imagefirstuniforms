@@ -43,7 +43,8 @@
   {%- for tag in customer.tags -%}
     {%- assign tag_lower = tag | downcase | strip -%}
     {%- assign tag_prefix = tag_lower | slice: 0, 6 -%}
-    {%- if tag_prefix == 'akima ' -%}
+    {%- comment -%}"Akima Store" (webhook shopper tag) also starts with "akima " but is not a location tag{%- endcomment -%}
+    {%- if tag_prefix == 'akima ' and tag_lower != 'akima store' -%}
       {%- assign has_akima_company_tag = true -%}
       {%- break -%}
     {%- endif -%}

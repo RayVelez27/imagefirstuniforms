@@ -115,6 +115,22 @@
             {%- endif -%}
             {%- endcomment -%}
 
+            {%- comment -%}
+              "Akima Store" (webhook tag for password-gate shoppers) routes to the
+              Akima Store collection — the page-based fallback below would otherwise
+              match it to the gate page (/pages/akima-store).
+            {%- endcomment -%}
+            {%- unless collection_route_found -%}
+              {%- for tag in customer.tags -%}
+                {%- assign tag_lower = tag | downcase | strip -%}
+                {%- if tag_lower == 'akima store' -%}
+                  {%- assign final_url = '/collections/akima-store' -%}
+                  {%- assign collection_route_found = true -%}
+                  {%- break -%}
+                {%- endif -%}
+              {%- endfor -%}
+            {%- endunless -%}
+
             {%- comment -%} If no collection mapping found, fall back to original page-based logic {%- endcomment -%}
             {%- unless collection_route_found -%}
             {%- assign valid_tags = "" -%}

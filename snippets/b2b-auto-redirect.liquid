@@ -60,6 +60,32 @@
           window.location.href = '{{ limit_redirect_url }}';
         </script>
       {%- else -%}
+      {%- comment -%}
+        "Akima Store" (the webhook tag for password-gate shoppers) must route to
+        the Akima Store COLLECTION. Without this, the page-based fallback below
+        matches it to the gate page (/pages/akima-store — "Akima Store" handleizes
+        to that, and it sorts first alphabetically), stranding tagged customers
+        on the password screen.
+      {%- endcomment -%}
+      {%- assign akima_store_redirect = false -%}
+      {%- for tag in customer.tags -%}
+        {%- assign tag_lower = tag | downcase | strip -%}
+        {%- if tag_lower == 'akima store' -%}
+          {%- assign akima_store_redirect = true -%}
+          {%- break -%}
+        {%- endif -%}
+      {%- endfor -%}
+
+      {%- if akima_store_redirect -%}
+        <script>
+          console.log('=== B2B REDIRECT DEBUG ===');
+          console.log('Customer tags:', {{ customer.tags | json }});
+          console.log('User has "Akima Store" tag - redirecting to Akima Store collection');
+          console.log('========================');
+
+          window.location.href = '/collections/akima-store';
+        </script>
+      {%- else -%}
       {%- comment -%} Standard page-based routing for non-Limit users {%- endcomment -%}
       {%- assign valid_tags = "" -%}
       {%- for tag in customer.tags -%}
@@ -101,6 +127,7 @@
           console.log('This means no pages exist with handles matching the customer tags');
           console.log('========================');
         </script>
+      {%- endif -%}
       {%- endif -%}
       {%- endif -%}
     {%- else -%}

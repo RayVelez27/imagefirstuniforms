@@ -12,9 +12,9 @@
     {%- elsif tag_lower == 'limit' -%}
       {%- assign has_limit_tag = true -%}
     {%- else -%}
-      {%- comment -%} Check if tag starts with "akima " (a location sub-tag) {%- endcomment -%}
+      {%- comment -%} Check if tag starts with "akima " (a location sub-tag; "Akima Store" is the webhook shopper tag, not a location) {%- endcomment -%}
       {%- assign tag_prefix = tag_lower | slice: 0, 6 -%}
-      {%- if tag_prefix == 'akima ' -%}
+      {%- if tag_prefix == 'akima ' and tag_lower != 'akima store' -%}
         {%- if akima_location_tags == '' -%}
           {%- assign akima_location_tags = tag -%}
         {%- else -%}
