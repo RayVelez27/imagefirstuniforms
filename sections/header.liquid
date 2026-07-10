@@ -222,9 +222,15 @@ IMPLEMENTATION NOTE: the header in Focal is pretty complex as it allows a lot of
     akima-store-mode class (on <html>, set client-side), so regular visitors are
     unaffected. data-item-title comes from snippets/desktop-menu.liquid; the `i`
     flag makes the match case-insensitive.
+
+    Also applied for logged-in customers tagged "Akima Store" (akima-tagged class,
+    set from Liquid in snippets/akima-store-mode.liquid) — they get the Akima nav
+    bar permanently, without needing the password-gate session.
   */
   .akima-store-mode .header__linklist-item[data-item-title="Home" i],
-  .akima-store-mode .header__linklist-item[data-item-title="Shop" i] {
+  .akima-store-mode .header__linklist-item[data-item-title="Shop" i],
+  .akima-tagged .header__linklist-item[data-item-title="Home" i],
+  .akima-tagged .header__linklist-item[data-item-title="Shop" i] {
     display: none !important;
   }
 </style>
@@ -246,6 +252,24 @@ IMPLEMENTATION NOTE: the header in Focal is pretty complex as it allows a lot of
   {%- assign is_akima_home = true -%}
 {%- endif -%}
 
+{%- comment -%}
+  Customers tagged "Akima Store" get the Akima nav permanently (akima-tagged
+  class, see snippets/akima-store-mode.liquid). For them "Exit Store" is
+  meaningless — there is no gate session to exit and the tag would bring the
+  nav straight back — so on the Akima collection they get no left control
+  instead of the Exit button.
+{%- endcomment -%}
+{%- assign customer_akima_store_tagged = false -%}
+{%- if customer -%}
+  {%- for tag in customer.tags -%}
+    {%- assign tag_lower = tag | downcase | strip -%}
+    {%- if tag_lower == 'akima store' -%}
+      {%- assign customer_akima_store_tagged = true -%}
+      {%- break -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+
 <store-header {% if section.settings.enable_sticky_header %}sticky{% endif %} {% if request.page_type == 'index' and section.settings.enable_transparent_header %}transparent{% endif %} class="header {% if settings.background == settings.header_background %}header--bordered{% endif %} {% if request.page_type == 'index' and section.settings.enable_transparent_header %}header--transparent{% endif %} {% if is_akima_gate %}header--akima-gate{% endif %}" role="banner">
   {%- assign menu = section.settings.navigation_menu -%}
 
@@ -255,7 +279,9 @@ IMPLEMENTATION NOTE: the header in Focal is pretty complex as it allows a lot of
       <nav class="header__inline-navigation" {% unless section.settings.header_layout == 'logo_center_search_open' %}role="navigation"{% endunless %}>
         {%- comment -%}Akima Store mode control (shown via CSS only when akima-store-mode is active){%- endcomment -%}
         {%- if is_akima_home -%}
-          <button type="button" class="header__akima-nav header__akima-nav--exit" id="AkimaStoreExit">Exit Store</button>
+          {%- unless customer_akima_store_tagged -%}
+            <button type="button" class="header__akima-nav header__akima-nav--exit" id="AkimaStoreExit">Exit Store</button>
+          {%- endunless -%}
         {%- else -%}
           <a href="/collections/akima-store" class="header__akima-nav header__akima-nav--back" data-no-instant><span class="header__akima-nav-arrow" aria-hidden="true">&#8592;</span> Back Home</a>
         {%- endif -%}
@@ -604,7 +630,11 @@ SEARCH DRAWER - Only for logged-in users
 <script>
   (function () {
     try {
-      if (sessionStorage.getItem('akima-store-gate') !== 'granted') return;
+      // Gate-session visitors (sessionStorage) OR customers tagged "Akima Store"
+      // (akima-tagged class, set in <head> by snippets/akima-store-mode.liquid).
+      var inAkimaSession = sessionStorage.getItem('akima-store-gate') === 'granted';
+      var isTagged = document.documentElement.classList.contains('akima-tagged');
+      if (!inAkimaSession && !isTagged) return;
       var logoLink = document.querySelector('.header__logo-link');
       if (logoLink) logoLink.setAttribute('href', '/collections/akima-store');
     } catch (e) {}

@@ -10,8 +10,26 @@
 
   Pair with sections/password-gate.liquid, which sets the same sessionStorage key.
   Client-side only — see notes in password-gate.liquid.
+
+  Customers tagged "Akima Store" (applied by the orders/create webhook after a
+  gated purchase) bypass the gate entirely: they see the Akima nav bar site-wide
+  (see snippets/akima-store-mode.liquid, `akima-tagged`), so its "Back Home" /
+  logo links to this collection must not bounce them to the password page.
+  Checked server-side in Liquid, so the guard renders nothing for them.
 {%- endcomment -%}
 
+{%- assign customer_akima_store_tagged = false -%}
+{%- if customer -%}
+  {%- for tag in customer.tags -%}
+    {%- assign tag_lower = tag | downcase | strip -%}
+    {%- if tag_lower == 'akima store' -%}
+      {%- assign customer_akima_store_tagged = true -%}
+      {%- break -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+
+{%- unless customer_akima_store_tagged -%}
 {%- liquid
   assign storage_key = 'akima-store-gate'
   assign storage_value = 'granted'
@@ -37,3 +55,4 @@
     }
   })();
 </script>
+{%- endunless -%}

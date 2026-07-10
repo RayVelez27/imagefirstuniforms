@@ -21,7 +21,31 @@
 
   Rendered in the <head> so the class is set before paint (no flash of the toggle).
   Client-side only — see notes in password-gate.liquid.
+
+  Tagged customers ("Akima Store"): customers who previously ordered through the
+  gate get tagged "Akima Store" by the orders/create webhook. When such a
+  customer is logged in, we add an `akima-tagged` class to <html> (server-side
+  decision, so it works with no gate session) that reproduces ONLY the Akima
+  nav bar — the Back Home / Exit Store control, hidden Home/Shop items, and the
+  stripped header. It deliberately does NOT force the order mode, stamp the cart
+  with `_akima_store`, or change cart payment options — those stay exclusive to
+  the password-gate session (`akima-store-mode`).
 {%- endcomment -%}
+
+{%- assign customer_akima_store_tagged = false -%}
+{%- if customer -%}
+  {%- for tag in customer.tags -%}
+    {%- assign tag_lower = tag | downcase | strip -%}
+    {%- if tag_lower == 'akima store' -%}
+      {%- assign customer_akima_store_tagged = true -%}
+      {%- break -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+
+{%- if customer_akima_store_tagged -%}
+<script>document.documentElement.classList.add('akima-tagged');</script>
+{%- endif -%}
 
 <script>
   (function () {
@@ -85,10 +109,13 @@
   .header__akima-cart { display: none !important; }
 
   .akima-store-mode .header__hamburger,
-  .akima-store-mode .header__account-link { display: none !important; }
+  .akima-store-mode .header__account-link,
+  .akima-tagged .header__hamburger,
+  .akima-tagged .header__account-link { display: none !important; }
 
   /* More specific than the hide rule above, so it wins once the gate is passed. */
-  .akima-store-mode .header__akima-cart { display: block !important; }
+  .akima-store-mode .header__akima-cart,
+  .akima-tagged .header__akima-cart { display: block !important; }
 
   /*
     Akima Store mode nav control: the "Exit store" button (on the akima-store
@@ -98,7 +125,8 @@
   */
   .header__akima-nav { display: none !important; }
 
-  .akima-store-mode .header__akima-nav {
+  .akima-store-mode .header__akima-nav,
+  .akima-tagged .header__akima-nav {
     display: inline-flex !important;
     align-items: center;
     /* Breathing room to the right so the button isn't crowded against the nav
@@ -120,7 +148,8 @@
     transition: background-color 0.2s ease, border-color 0.2s ease;
   }
 
-  .akima-store-mode .header__akima-nav:hover {
+  .akima-store-mode .header__akima-nav:hover,
+  .akima-tagged .header__akima-nav:hover {
     background: rgba(var(--header-text-color), 0.12);
     border-color: rgb(var(--header-text-color));
   }
