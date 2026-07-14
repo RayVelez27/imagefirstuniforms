@@ -190,4 +190,12 @@
   */
   .akima-store-mode .cart__pay-later-button { display: none !important; }
   .akima-store-mode .cart-attributes__field--po { display: none !important; }
+
+  /*
+    No breadcrumbs in Akima Store mode: the "Home / ..." trail (collection
+    banner, product, page, and blog templates all share .breadcrumb) exposes
+    the real store's navigation — the Back Home nav control is the only
+    wayfinding the gated store should offer.
+  */
+  .akima-store-mode .breadcrumb { display: none !important; }
 </style>
