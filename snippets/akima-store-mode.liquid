@@ -24,12 +24,16 @@
 
   Tagged customers ("Akima Store"): customers who previously ordered through the
   gate get tagged "Akima Store" by the orders/create webhook. When such a
-  customer is logged in, we add an `akima-tagged` class to <html> (server-side
-  decision, so it works with no gate session) that reproduces ONLY the Akima
-  nav bar — the Back Home / Exit Store control, hidden Home/Shop items, and the
-  stripped header. It deliberately does NOT force the order mode, stamp the cart
-  with `_akima_store`, or change cart payment options — those stay exclusive to
-  the password-gate session (`akima-store-mode`).
+  customer is logged in, they get the FULL Akima Store treatment permanently
+  (server-side decision, so it works with no gate session): both the
+  `akima-tagged` and `akima-store-mode` classes on <html> (so every
+  akima-store-mode CSS rule applies — stripped header, hidden Home/Shop items,
+  hidden order-mode toggle, cart with Pay Now only and no PO Number field),
+  plus the forced "regular" order mode and the `_akima_store` cart stamp.
+  Unlike the gate session there is nothing to exit: the root route does NOT end
+  their treatment and the cart marker is never cleared, so their orders keep
+  getting tagged. (Their "Exit Store" button is already suppressed in
+  sections/header.liquid.)
 {%- endcomment -%}
 
 {%- assign customer_akima_store_tagged = false -%}
@@ -44,9 +48,30 @@
 {%- endif -%}
 
 {%- if customer_akima_store_tagged -%}
-<script>document.documentElement.classList.add('akima-tagged');</script>
-{%- endif -%}
+<script>
+  (function () {
+    // Tagged customers: full Akima Store treatment on every route, permanently.
+    // akima-store-mode is added alongside akima-tagged so all mode CSS applies.
+    document.documentElement.classList.add('akima-tagged', 'akima-store-mode');
+    try {
+      sessionStorage.setItem('orderMode', 'regular');
 
+      // Stamp the cart with the Akima Store marker so it carries into checkout
+      // and the orders/create webhook keeps tagging their orders. Guarded by a
+      // session flag so it only fires once per session.
+      if (sessionStorage.getItem('akima-cart-tagged') !== '1') {
+        fetch('/cart/update.js', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ attributes: { '_akima_store': 'true' } })
+        }).then(function () {
+          sessionStorage.setItem('akima-cart-tagged', '1');
+        }).catch(function () {});
+      }
+    } catch (e) {}
+  })();
+</script>
+{%- else -%}
 <script>
   (function () {
     try {
@@ -89,9 +114,11 @@
     } catch (e) {}
   })();
 </script>
+{%- endif -%}
 
 <style>
-  /* Hide the Regular Order / Bulk Order toggle for password-gate visitors */
+  /* Hide the Regular Order / Bulk Order toggle for password-gate visitors
+     and tagged customers (they get the akima-store-mode class too) */
   .akima-store-mode .product-form__order-mode-toggle { display: none !important; }
 
   /*
@@ -157,8 +184,9 @@
   .header__akima-nav-arrow { font-size: 16px; line-height: 1; }
 
   /*
-    Akima Store mode cart (/cart): password-gate visitors pay immediately.
-    Hide the "Pay Later" button (leaving only "Pay Now") and the PO Number field.
+    Akima Store mode cart (/cart): password-gate visitors and "Akima Store"
+    tagged customers pay immediately. Hide the "Pay Later" button (leaving only
+    "Pay Now") and the PO Number field.
   */
   .akima-store-mode .cart__pay-later-button { display: none !important; }
   .akima-store-mode .cart-attributes__field--po { display: none !important; }
