@@ -37,6 +37,9 @@ NOTE TO DEVELOPERS: welcome to Focal theme! We hope that you will enjoy editing 
     {%- comment -%}Apply password-gate "Akima Store mode" UI tweaks before paint{%- endcomment -%}
     {%- render 'akima-store-mode' -%}
 
+    {%- comment -%}Redirect logged-out visitors off collection/product pages to home{%- endcomment -%}
+    {%- render 'login-required-guard' -%}
+
     {%- if settings.favicon -%}
       <link rel="shortcut icon" href="{{ settings.favicon | image_url: width: 96 }}" type="image/png">
     {%- endif -%}
