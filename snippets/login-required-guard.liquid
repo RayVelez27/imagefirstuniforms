@@ -1,8 +1,13 @@
 {%- comment -%}
   Login-required guard
 
-  Redirects logged-out visitors away from collection and product pages to the
-  home page. Rendered in <head> from layout/theme.liquid.
+  Redirects logged-out visitors away from collection, product and page
+  (/pages/*) URLs to the home page. Rendered in <head> from layout/theme.liquid.
+
+  The password-gate entry page (/pages/akima-store, the 'gate' template) is
+  never guarded — logged-out visitors must reach it to enter the password and
+  unlock the gate. It is matched both by handle and by template suffix so a
+  renamed handle still can't lock people out of the gate.
 
   Who is allowed through:
     - Logged-in customers: never guarded (the render below is skipped server-side
@@ -11,8 +16,8 @@
       session has sessionStorage 'akima-store-gate' = 'granted' (set by
       sections/password-gate.liquid). They browse the gated collection AND its
       product pages while logged OUT, so the JS below lets them through on any
-      product/collection page — matching how snippets/akima-store-mode.liquid
-      already applies akima-store-mode site-wide for these visitors.
+      guarded page — matching how snippets/akima-store-mode.liquid already
+      applies akima-store-mode site-wide for these visitors.
     - Everyone else who is logged out: redirected to routes.root_url (home).
 
   Not rendered on the gated collection template (`template.suffix == 'gated'`):
@@ -26,8 +31,21 @@
 {%- endcomment -%}
 
 {%- if customer == blank -%}
+  {%- assign guard_this_page = false -%}
+
   {%- if request.page_type == 'collection' or request.page_type == 'product' -%}
+    {%- comment -%} The gated Akima collection keeps its own collection-gate-guard. {%- endcomment -%}
     {%- unless template.name == 'collection' and template.suffix == 'gated' -%}
+      {%- assign guard_this_page = true -%}
+    {%- endunless -%}
+  {%- elsif request.page_type == 'page' -%}
+    {%- comment -%} Guard all /pages/* except the password-gate entry page. {%- endcomment -%}
+    {%- unless page.handle == 'akima-store' or template.suffix == 'gate' -%}
+      {%- assign guard_this_page = true -%}
+    {%- endunless -%}
+  {%- endif -%}
+
+  {%- if guard_this_page -%}
       <style id="LoginGuardHide">body { visibility: hidden !important; }</style>
       <noscript><style>body { visibility: visible !important; }</style></noscript>
       <script>
@@ -44,6 +62,5 @@
           }
         })();
       </script>
-    {%- endunless -%}
   {%- endif -%}
 {%- endif -%}
