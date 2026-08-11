@@ -324,20 +324,35 @@
   }
 
   .location-row {
-    display: grid;
-    grid-template-columns: minmax(140px, 1fr) minmax(300px, 2.4fr) auto auto;
-    align-items: center;
-    gap: 15px;
-    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 18px 20px;
     border: 1px solid #eee;
-    border-radius: 6px;
+    border-radius: 8px;
     background: #fafafa;
+  }
+
+  .location-row-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #ececec;
+  }
+
+  .location-row-controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
   }
 
   .location-address-fields {
     display: grid;
     grid-template-columns: 2fr 1fr 1fr;
-    gap: 8px;
+    gap: 12px 14px;
   }
 
   .location-field {
@@ -398,7 +413,8 @@
 
   .location-name {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 15px;
+    color: #222;
   }
 
   .card-toggle {
@@ -461,8 +477,8 @@
       grid-template-columns: 1fr;
     }
 
-    .location-row {
-      grid-template-columns: 1fr;
+    .location-row-header {
+      align-items: flex-start;
     }
 
     .location-address-fields {
@@ -728,10 +744,19 @@
       actions.appendChild(saveBtn);
       actions.appendChild(status);
 
-      row.appendChild(nameEl);
+      // Top row: name on the left, Card Payment toggle + Save on the right
+      const header = document.createElement('div');
+      header.className = 'location-row-header';
+      const controls = document.createElement('div');
+      controls.className = 'location-row-controls';
+      controls.appendChild(toggle);
+      controls.appendChild(actions);
+      header.appendChild(nameEl);
+      header.appendChild(controls);
+
+      // Bottom row: the address fields
+      row.appendChild(header);
       row.appendChild(addrWrap);
-      row.appendChild(toggle);
-      row.appendChild(actions);
       list.appendChild(row);
     });
   }
