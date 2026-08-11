@@ -141,52 +141,46 @@
     {%- if show_target_locations -%}
     <div class="settings-section" id="locations-settings-section">
       <h3 class="settings-section-title">Locations</h3>
-      <p class="settings-section-description">Billing uses the universal Global Billing Address above. Set each location&rsquo;s shipping address and toggle Card Payment on or off.</p>
+      <p class="settings-section-description">Billing uses the universal Global Billing Address above. Set each location&rsquo;s shipping address and toggle Card Payment on or off, then save that location.</p>
 
       <div id="target-locations-list" class="locations-list">
         <div class="dashboard-loading">Loading locations&hellip;</div>
       </div>
 
-      <div class="section-actions">
-        <button type="button" id="save-locations-btn" class="button button--primary">Save Locations</button>
-        <span id="locations-success" class="section-success" style="display: none;">Saved!</span>
-        <span id="locations-error" class="section-error" style="display: none;"></span>
-      </div>
-
       {%- comment -%} Default location list — used as the seed; saved overrides (address + toggle) are merged on load. {%- endcomment -%}
       <script type="application/json" id="target-locations-defaults">
 [
-  { "name": "TH - General - Coporate Office", "address": "9320 Lakeside Blvd, Suite 300, The Woodlands, Texas 77381" },
-  { "name": "TH - General - Permian Regional Office", "address": "12308 W Hwy 80 E, Odessa, TX 79765" },
-  { "name": "TH - Hospitality - Big Spring Lodge", "address": "5101 E. Midway Road, Big Spring, TX 79720" },
-  { "name": "TH - Hospitality - Carlsbad Lodge", "address": "4018 Iron Horse Drive, Carlsbad, NM 88220" },
-  { "name": "TH - Hospitality - Cheecham Lodge", "address": "PO Box 5447, Fort McMurray, Alberta T9H 3G4" },
-  { "name": "TH - Hospitality - Jal Lodge", "address": "218 Whitworth Drive, Jal, NM 88252" },
-  { "name": "TH - Hospitality - Kermit North Lodge", "address": "514 E. Dallas Avenue, Kermit, TX 79745" },
-  { "name": "TH - Hospitality - Kermit South Lodge", "address": "549 E. Highway 115, Kermit, TX 79745" },
-  { "name": "TH - Hospitality - Mentone Wolfcamp Lodge", "address": "991 County Road 300, Mentone, TX 79754" },
-  { "name": "TH - Hospitality - Midland East Lodge", "address": "7612 E County Rd 79, Midland, TX 79706" },
-  { "name": "TH - Hospitality - Midland Lodge", "address": "11508 W County Rd 33, Midland, TX 79707" },
-  { "name": "TH - Hospitality - New Frontier RV Park", "address": "4360 Rim Rock Road, Winnemucca, NV 89445" },
-  { "name": "TH - Hospitality - Odessa East Lodge", "address": "2575 East Pearl St, Odessa, TX 79761" },
-  { "name": "TH - Hospitality - Odessa West Lodge", "address": "16531 Interstate 20, Odessa, Texas 79763" },
-  { "name": "TH - Hospitality - Orla El Capitan Lodge", "address": "16600 FM 652, Orla, TX 79770" },
-  { "name": "TH - Hospitality - Orla North Lodge", "address": "52 FM 652 W, Orla, TX 79770" },
-  { "name": "TH - Hospitality - Orla South Lodge", "address": "69 FM 652 West, Orla, TX 79770" },
-  { "name": "TH - Hospitality - Pecos RV Park", "address": "470 FM 1450, Pecos, TX 79772" },
-  { "name": "TH - Hospitality - Powder River Lodge", "address": "1000 Fergy Ln #596, Gillette, WY 82718" },
-  { "name": "TH - Hospitality - Seven Rivers Lodge", "address": "3401 Boyd Drive, Carlsbad, NM 88220" },
-  { "name": "TH - Hospitality - Skillman Lodge", "address": "4393 County Road 300, Mentone, TX 79754" },
-  { "name": "TH - Hospitality - Thacker Pass WFH", "address": "6500 Winnemucca Blvd, Winnemucca, NV 89445" },
-  { "name": "TH - Hospitality - Watford City Lodge", "address": "2509 14th St NW, Watford City, ND 58854" },
-  { "name": "TH - Hospitality - Williams County Lodge", "address": "4905 146th Dr NW, Williston, ND 58801" },
-  { "name": "TH - HyperScale - Gateway Workforce Hub", "address": "880 FM 2363, Quanah TX 79252" },
-  { "name": "TH - HyperScale - Jackrabbit Flats", "address": "63 County Road 118, Pecos, TX 79772" },
-  { "name": "TH - HyperScale - Patton Springs WFH", "address": "990 W. FM 193, Afton, TX 79220" },
-  { "name": "TH - HyperScale - Pecos North WFH", "address": "2310 S. Teague Drive, Pecos, TX 79772" },
-  { "name": "TH - HyperScale - Pecos South WFH", "address": "23 County Road 116, Pecos, TX 79772" },
-  { "name": "TH - HyperScale - Pecos West WFH", "address": "2237 Business Loop I-20 West, Pecos, TX 79772" },
-  { "name": "TH - HyperScale - Red River Rise Lodge", "address": "6100 CR 111 South, Vernon TX 76384" }
+  { "name": "TH - General - Coporate Office", "address": "9320 Lakeside Blvd, Suite 300", "city": "The Woodlands", "state": "Texas", "zip": "77381" },
+  { "name": "TH - General - Permian Regional Office", "address": "12308 W Hwy 80 E", "city": "Odessa", "state": "TX", "zip": "79765" },
+  { "name": "TH - Hospitality - Big Spring Lodge", "address": "5101 E. Midway Road", "city": "Big Spring", "state": "TX", "zip": "79720" },
+  { "name": "TH - Hospitality - Carlsbad Lodge", "address": "4018 Iron Horse Drive", "city": "Carlsbad", "state": "NM", "zip": "88220" },
+  { "name": "TH - Hospitality - Cheecham Lodge", "address": "PO Box 5447", "city": "Fort McMurray", "state": "Alberta", "zip": "T9H 3G4" },
+  { "name": "TH - Hospitality - Jal Lodge", "address": "218 Whitworth Drive", "city": "Jal", "state": "NM", "zip": "88252" },
+  { "name": "TH - Hospitality - Kermit North Lodge", "address": "514 E. Dallas Avenue", "city": "Kermit", "state": "TX", "zip": "79745" },
+  { "name": "TH - Hospitality - Kermit South Lodge", "address": "549 E. Highway 115", "city": "Kermit", "state": "TX", "zip": "79745" },
+  { "name": "TH - Hospitality - Mentone Wolfcamp Lodge", "address": "991 County Road 300", "city": "Mentone", "state": "TX", "zip": "79754" },
+  { "name": "TH - Hospitality - Midland East Lodge", "address": "7612 E County Rd 79", "city": "Midland", "state": "TX", "zip": "79706" },
+  { "name": "TH - Hospitality - Midland Lodge", "address": "11508 W County Rd 33", "city": "Midland", "state": "TX", "zip": "79707" },
+  { "name": "TH - Hospitality - New Frontier RV Park", "address": "4360 Rim Rock Road", "city": "Winnemucca", "state": "NV", "zip": "89445" },
+  { "name": "TH - Hospitality - Odessa East Lodge", "address": "2575 East Pearl St", "city": "Odessa", "state": "TX", "zip": "79761" },
+  { "name": "TH - Hospitality - Odessa West Lodge", "address": "16531 Interstate 20", "city": "Odessa", "state": "Texas", "zip": "79763" },
+  { "name": "TH - Hospitality - Orla El Capitan Lodge", "address": "16600 FM 652", "city": "Orla", "state": "TX", "zip": "79770" },
+  { "name": "TH - Hospitality - Orla North Lodge", "address": "52 FM 652 W", "city": "Orla", "state": "TX", "zip": "79770" },
+  { "name": "TH - Hospitality - Orla South Lodge", "address": "69 FM 652 West", "city": "Orla", "state": "TX", "zip": "79770" },
+  { "name": "TH - Hospitality - Pecos RV Park", "address": "470 FM 1450", "city": "Pecos", "state": "TX", "zip": "79772" },
+  { "name": "TH - Hospitality - Powder River Lodge", "address": "1000 Fergy Ln #596", "city": "Gillette", "state": "WY", "zip": "82718" },
+  { "name": "TH - Hospitality - Seven Rivers Lodge", "address": "3401 Boyd Drive", "city": "Carlsbad", "state": "NM", "zip": "88220" },
+  { "name": "TH - Hospitality - Skillman Lodge", "address": "4393 County Road 300", "city": "Mentone", "state": "TX", "zip": "79754" },
+  { "name": "TH - Hospitality - Thacker Pass WFH", "address": "6500 Winnemucca Blvd", "city": "Winnemucca", "state": "NV", "zip": "89445" },
+  { "name": "TH - Hospitality - Watford City Lodge", "address": "2509 14th St NW", "city": "Watford City", "state": "ND", "zip": "58854" },
+  { "name": "TH - Hospitality - Williams County Lodge", "address": "4905 146th Dr NW", "city": "Williston", "state": "ND", "zip": "58801" },
+  { "name": "TH - HyperScale - Gateway Workforce Hub", "address": "880 FM 2363", "city": "Quanah", "state": "TX", "zip": "79252" },
+  { "name": "TH - HyperScale - Jackrabbit Flats", "address": "63 County Road 118", "city": "Pecos", "state": "TX", "zip": "79772" },
+  { "name": "TH - HyperScale - Patton Springs WFH", "address": "990 W. FM 193", "city": "Afton", "state": "TX", "zip": "79220" },
+  { "name": "TH - HyperScale - Pecos North WFH", "address": "2310 S. Teague Drive", "city": "Pecos", "state": "TX", "zip": "79772" },
+  { "name": "TH - HyperScale - Pecos South WFH", "address": "23 County Road 116", "city": "Pecos", "state": "TX", "zip": "79772" },
+  { "name": "TH - HyperScale - Pecos West WFH", "address": "2237 Business Loop I-20 West", "city": "Pecos", "state": "TX", "zip": "79772" },
+  { "name": "TH - HyperScale - Red River Rise Lodge", "address": "6100 CR 111 South", "city": "Vernon", "state": "TX", "zip": "76384" }
 ]
       </script>
     </div>
@@ -331,7 +325,7 @@
 
   .location-row {
     display: grid;
-    grid-template-columns: 1fr 1.4fr auto;
+    grid-template-columns: minmax(140px, 1fr) minmax(300px, 2.4fr) auto auto;
     align-items: center;
     gap: 15px;
     padding: 12px 14px;
@@ -340,12 +334,29 @@
     background: #fafafa;
   }
 
-  .location-name {
-    font-weight: 600;
-    font-size: 14px;
+  .location-address-fields {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 8px;
   }
 
-  .location-address-input {
+  .location-field {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .location-field--full {
+    grid-column: 1 / -1;
+  }
+
+  .location-field label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #555;
+    margin-bottom: 4px;
+  }
+
+  .location-field input {
     width: 100%;
     padding: 8px 10px;
     border: 1px solid #ddd;
@@ -355,9 +366,39 @@
     background-color: #fff;
   }
 
-  .location-address-input:focus {
+  .location-field input:focus {
     outline: none;
     border-color: #4CAF50;
+  }
+
+  .location-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+  }
+
+  .location-save-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+
+  .location-status {
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .location-status--success {
+    color: #2e7d32;
+  }
+
+  .location-status--error {
+    color: #d32f2f;
+  }
+
+  .location-name {
+    font-weight: 600;
+    font-size: 14px;
   }
 
   .card-toggle {
@@ -421,6 +462,10 @@
     }
 
     .location-row {
+      grid-template-columns: 1fr;
+    }
+
+    .location-address-fields {
       grid-template-columns: 1fr;
     }
   }
@@ -579,9 +624,10 @@
   }
 
   // ===== Target Locations =====
-  // In-memory state: [{ name, shippingAddress, cardPayment }]. Seeded from the
-  // defaults <script> block; overridden by saved settings (settings.locationsJson)
-  // on load. Billing is universal (Global Billing Address); shipping is per-location.
+  // In-memory state: [{ name, address, city, state, zip, cardPayment }]. Seeded
+  // from the defaults <script> block; overridden by saved settings
+  // (settings.locationsJson) on load. Billing is universal (Global Billing
+  // Address); shipping is per-location, split into address/city/state/zip.
   var locationsState = [];
 
   function initTargetLocations() {
@@ -597,13 +643,17 @@
     }
 
     locationsState = defaults.map(function (d) {
-      return { name: d.name, shippingAddress: d.address || '', cardPayment: true };
+      return {
+        name: d.name,
+        address: d.address || '',
+        city: d.city || '',
+        state: d.state || '',
+        zip: d.zip || '',
+        cardPayment: true
+      };
     });
 
     renderLocations();
-
-    const saveBtn = document.getElementById('save-locations-btn');
-    if (saveBtn) saveBtn.addEventListener('click', handleSaveLocations);
   }
 
   function renderLocations() {
@@ -622,13 +672,31 @@
 
       const addrWrap = document.createElement('div');
       addrWrap.className = 'location-address';
-      const addr = document.createElement('input');
-      addr.type = 'text';
-      addr.className = 'location-address-input';
-      addr.value = loc.shippingAddress || '';
-      addr.setAttribute('aria-label', 'Shipping address for ' + loc.name);
-      addr.setAttribute('placeholder', 'Shipping address');
-      addrWrap.appendChild(addr);
+      const fieldsGrid = document.createElement('div');
+      fieldsGrid.className = 'location-address-fields';
+
+      function addField(labelText, cls, value, isFull) {
+        const group = document.createElement('div');
+        group.className = 'location-field' + (isFull ? ' location-field--full' : '');
+        const lab = document.createElement('label');
+        lab.textContent = labelText;
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = cls;
+        inp.value = value || '';
+        inp.setAttribute('aria-label', labelText + ' for ' + loc.name);
+        group.appendChild(lab);
+        group.appendChild(inp);
+        fieldsGrid.appendChild(group);
+        return inp;
+      }
+
+      addField('Address', 'location-address-input', loc.address, true);
+      addField('City', 'location-city-input', loc.city, false);
+      addField('State', 'location-state-input', loc.state, false);
+      addField('Zip Code', 'location-zip-input', loc.zip, false);
+
+      addrWrap.appendChild(fieldsGrid);
 
       const toggle = document.createElement('label');
       toggle.className = 'card-toggle';
@@ -645,9 +713,25 @@
       toggle.appendChild(slider);
       toggle.appendChild(tlabel);
 
+      const actions = document.createElement('div');
+      actions.className = 'location-row-actions';
+      const saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.className = 'button button--primary location-save-btn';
+      saveBtn.textContent = 'Save';
+      const status = document.createElement('span');
+      status.className = 'location-status';
+      status.style.display = 'none';
+      saveBtn.addEventListener('click', function () {
+        saveLocationRow(row, saveBtn, status);
+      });
+      actions.appendChild(saveBtn);
+      actions.appendChild(status);
+
       row.appendChild(nameEl);
       row.appendChild(addrWrap);
       row.appendChild(toggle);
+      row.appendChild(actions);
       list.appendChild(row);
     });
   }
@@ -666,9 +750,12 @@
     locationsState.forEach(function (loc) {
       const o = overrides[loc.name];
       if (o && typeof o === 'object') {
-        // Accept `shippingAddress` (current) or legacy `address` from earlier saves
-        if (typeof o.shippingAddress === 'string') loc.shippingAddress = o.shippingAddress;
-        else if (typeof o.address === 'string') loc.shippingAddress = o.address;
+        if (typeof o.address === 'string') loc.address = o.address;
+        if (typeof o.city === 'string') loc.city = o.city;
+        if (typeof o.state === 'string') loc.state = o.state;
+        if (typeof o.zip === 'string') loc.zip = o.zip;
+        // Legacy single-line saves (shippingAddress) fall back into the Address field
+        if (o.address == null && typeof o.shippingAddress === 'string') loc.address = o.shippingAddress;
         if (typeof o.cardPayment === 'boolean') loc.cardPayment = o.cardPayment;
       }
     });
@@ -676,28 +763,80 @@
     renderLocations();
   }
 
-  function handleSaveLocations() {
+  // Reads the current DOM values of every location row into `locationsState`.
+  // All locations share one stored blob (locationsJson), so a per-row save must
+  // still persist the full set to avoid clobbering the other rows' saved values.
+  function syncLocationsFromDom() {
     const list = document.getElementById('target-locations-list');
     if (!list) return;
-
-    const out = {};
     list.querySelectorAll('.location-row').forEach(function (row) {
       const i = parseInt(row.dataset.index, 10);
       if (isNaN(i) || !locationsState[i]) return;
-      const name = locationsState[i].name;
-      const shippingAddress = row.querySelector('.location-address-input').value;
-      const cardPayment = row.querySelector('.location-card-payment').checked;
-
-      // Keep state in sync so a later reload/re-render reflects edits
-      locationsState[i].shippingAddress = shippingAddress;
-      locationsState[i].cardPayment = cardPayment;
-
-      out[name] = { shippingAddress: shippingAddress, cardPayment: cardPayment };
+      locationsState[i].address = row.querySelector('.location-address-input').value;
+      locationsState[i].city = row.querySelector('.location-city-input').value;
+      locationsState[i].state = row.querySelector('.location-state-input').value;
+      locationsState[i].zip = row.querySelector('.location-zip-input').value;
+      locationsState[i].cardPayment = row.querySelector('.location-card-payment').checked;
     });
+  }
 
-    // Stored as a JSON string so it rides along with the existing scalar
-    // global-settings fields without needing a backend schema change.
-    const data = { locationsJson: JSON.stringify(out) };
-    saveSection(data, 'save-locations-btn', 'locations-success', 'locations-error', 'Save Locations');
+  function buildLocationsBlob() {
+    const out = {};
+    locationsState.forEach(function (loc) {
+      out[loc.name] = {
+        address: loc.address,
+        city: loc.city,
+        state: loc.state,
+        zip: loc.zip,
+        cardPayment: loc.cardPayment
+      };
+    });
+    return out;
+  }
+
+  async function saveLocationRow(row, btn, statusEl) {
+    // Capture every row's current values first so this save doesn't drop edits
+    // made to other rows since the last save.
+    syncLocationsFromDom();
+
+    try {
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      statusEl.style.display = 'none';
+      statusEl.classList.remove('location-status--success', 'location-status--error');
+
+      // Stored as a JSON string so it rides along with the existing scalar
+      // global-settings fields without needing a backend schema change.
+      const payload = { locationsJson: JSON.stringify(buildLocationsBlob()) };
+      if (companyId) payload.company = companyId;
+
+      const response = await fetch(`${SETTINGS_API_BASE}/save-global-settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Failed to save');
+      }
+
+      statusEl.textContent = 'Saved!';
+      statusEl.classList.add('location-status--success');
+      statusEl.style.display = 'inline';
+      setTimeout(function () {
+        statusEl.style.display = 'none';
+      }, 3000);
+
+    } catch (error) {
+      console.error('Error saving location:', error);
+      statusEl.textContent = error.message || 'Failed to save.';
+      statusEl.classList.add('location-status--error');
+      statusEl.style.display = 'inline';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save';
+    }
   }
 </script>
