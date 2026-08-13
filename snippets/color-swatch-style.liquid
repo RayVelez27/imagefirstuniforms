@@ -23,7 +23,13 @@
       if color_value_downcase == color_swatch_name
         assign color_swatch_value = color_swatch_parts.last | strip
 
-        if color_swatch_value contains '#'
+        if color_swatch_value contains 'split('
+          assign split_inner = color_swatch_value | remove: 'split(' | remove: ')' | strip
+          assign split_colors = split_inner | split: ','
+          assign split_color_1 = split_colors[0] | strip
+          assign split_color_2 = split_colors[1] | strip
+          assign color_swatch_style = 'background: linear-gradient(135deg, ' | append: split_color_1 | append: ' 50%, ' | append: split_color_2 | append: ' 50%)'
+        elsif color_swatch_value contains '#'
           assign color_swatch_style = 'background-color: ' | append: color_swatch_value
         elsif images[color_swatch_value] != blank
           assign color_swatch_image = images[color_swatch_value] | image_url: width: 72
