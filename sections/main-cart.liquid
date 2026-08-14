@@ -3,9 +3,6 @@
 {%- assign is_bulk_order_customer = false -%}
 {%- assign is_akima_customer = false -%}
 {%- assign is_manager_extended = false -%}
-{%- assign has_target_tag = false -%}
-{%- assign target_location_tag = '' -%}
-{%- assign is_target_location_customer = false -%}
 {%- if customer -%}
   {%- assign has_limit_tag = false -%}
   {%- assign has_bls_tag = false -%}
@@ -56,34 +53,6 @@
   {%- if has_akima_tag and has_limit_tag and has_akima_company_tag -%}
     {%- assign is_akima_company_customer = true -%}
   {%- endif -%}
-
-  {%- comment -%}
-    Target Hospitality location-lock: a customer tagged "Target Hospitality" carries a
-    per-location tag ("Hospitality - X", "Hyperscale - X", "General - X"). When combined
-    with the Limit tag we lock their shipping address to that location's saved address
-    (mirrors the GFS-USCIS billing lock, but shipping + per-location). The location tag is
-    matched to a saved location key client-side, so casing / "TH - " prefix differences are
-    tolerated (tags say "Hyperscale", stored keys say "TH - HyperScale").
-  {%- endcomment -%}
-  {%- for tag in customer.tags -%}
-    {%- assign tag_lower = tag | downcase | strip -%}
-    {%- if tag_lower == 'target hospitality' -%}
-      {%- assign has_target_tag = true -%}
-      {%- break -%}
-    {%- endif -%}
-  {%- endfor -%}
-  {%- if has_target_tag -%}
-    {%- for tag in customer.tags -%}
-      {%- assign tag_lower = tag | downcase | strip -%}
-      {%- if tag_lower contains 'hospitality - ' or tag_lower contains 'hyperscale - ' or tag_lower contains 'general - ' -%}
-        {%- assign target_location_tag = tag -%}
-        {%- break -%}
-      {%- endif -%}
-    {%- endfor -%}
-  {%- endif -%}
-  {%- if has_target_tag and has_limit_tag and target_location_tag != '' -%}
-    {%- assign is_target_location_customer = true -%}
-  {%- endif -%}
 {%- endif -%}
 
 {%- comment -%}Detect customer company for per-company billing address{%- endcomment -%}
@@ -92,8 +61,6 @@
   {%- assign customer_company_slug = 'blue-life-security' -%}
 {%- elsif has_akima_tag -%}
   {%- assign customer_company_slug = 'akima' -%}
-{%- elsif has_target_tag -%}
-  {%- assign customer_company_slug = 'target-hospitality' -%}
 {%- else -%}
   {%- for tag in customer.tags -%}
     {%- assign tag_lower = tag | downcase | strip -%}
@@ -108,16 +75,6 @@
 {%- assign apply_add_to_cart_limits = false -%}
 {%- if is_limited_customer and is_bulk_order_customer == false and is_akima_company_customer == false -%}
   {%- assign apply_add_to_cart_limits = true -%}
-{%- endif -%}
-
-{%- comment -%}
-  Card/express payment is hidden for Limit, Akima, and Manager+Extended customers (Pay Later only).
-  Target Hospitality location customers are an exception: their card elements are still rendered but
-  hidden, then revealed client-side only if their location's Card Payment toggle is ON.
-{%- endcomment -%}
-{%- assign show_card_payment = true -%}
-{%- if is_limited_customer or has_akima_tag or is_manager_extended -%}
-  {%- assign show_card_payment = false -%}
 {%- endif -%}
 
 <section>
@@ -893,16 +850,16 @@
                       </div>
 
                     {%- when 'express_checkout_buttons' -%}
-                      {%- comment -%}Hide express checkout for limited, Akima, and Manager+Extended customers - they can only use Pay Later. TH location customers render it hidden; JS reveals it when their location allows Card Payment.{%- endcomment -%}
-                      {%- if show_card_payment or is_target_location_customer -%}
+                      {%- comment -%}Hide express checkout for limited, Akima, and Manager+Extended customers - they can only use Pay Later{%- endcomment -%}
+                      {%- unless is_limited_customer or has_akima_tag or is_manager_extended -%}
                         {%- if additional_checkout_buttons -%}
-                          <div class="cart__recap-block{% unless show_card_payment %} th-card-only{% endunless %}"{% unless show_card_payment %} style="display: none;"{% endunless %} {{ block.shopify_attributes }}>
+                          <div class="cart__recap-block" {{ block.shopify_attributes }}>
                             <div class="additional-checkout-buttons additional-checkout-buttons--vertical">
                               {{- content_for_additional_checkout_buttons -}}
                             </div>
                           </div>
                         {%- endif -%}
-                      {%- endif -%}
+                      {%- endunless -%}
 
                     {%- when '@app' -%}
                       <div class="cart__recap-block">
@@ -911,12 +868,12 @@
                   {%- endcase -%}
                 {%- endfor -%}
 
-                {%- if show_card_payment or is_target_location_customer -%}
-                <button type="submit" class="cart__checkout-button checkout-button button button--primary button--full{% unless show_card_payment %} th-card-only{% endunless %}"{% unless show_card_payment %} style="display: none;"{% endunless %} name="checkout">
+                {%- unless is_limited_customer or has_akima_tag or is_manager_extended -%}
+                <button type="submit" class="cart__checkout-button checkout-button button button--primary button--full" name="checkout">
                   <span class="checkout-button__lock">{%- render 'icon' with 'lock' -%}</span>
                   Pay Now
                 </button>
-                {%- endif -%}
+                {%- endunless -%}
 
                 {%- comment -%}Pay Later Button - Shows as "Place Order" for Limit customers, primary for Manager+Extended{%- endcomment -%}
                 <button type="button" id="pay-later-btn" class="cart__pay-later-button button button--full{% if is_limited_customer or has_akima_tag or is_manager_extended %} cart__pay-later-button--primary{% endif %}">
@@ -942,10 +899,10 @@
                 </style>
               </form>
 
-              {%- comment -%}Hide "We accept" payment methods for limited, Akima, and Manager+Extended customers. TH location customers render it hidden; JS reveals it when their location allows Card Payment.{%- endcomment -%}
-              {%- if show_card_payment or is_target_location_customer -%}
+              {%- comment -%}Hide "We accept" payment methods for limited, Akima, and Manager+Extended customers{%- endcomment -%}
+              {%- unless is_limited_customer or has_akima_tag or is_manager_extended -%}
                 {%- if section.settings.show_payment_methods and shop.enabled_payment_types.size > 0 -%}
-                  <div class="cart__payment-methods{% unless show_card_payment %} th-card-only{% endunless %}"{% unless show_card_payment %} style="display: none;"{% endunless %}>
+                  <div class="cart__payment-methods">
                     <span class="cart__payment-methods-label text--xsmall text--subdued">{{ 'cart.general.we_accept' | t }}</span>
 
                     <div class="payment-methods-list payment-methods-list--center">
@@ -955,7 +912,7 @@
                     </div>
                   </div>
                 {%- endif -%}
-              {%- endif -%}
+              {%- endunless -%}
             </safe-sticky>
           </div>
         </div>
@@ -1657,10 +1614,6 @@ document.addEventListener('DOMContentLoaded', function() {
   var isAkimaCompanyCustomer = {{ is_akima_company_customer | json }};
   var isManagerExtended = {{ is_manager_extended | json }};
 
-  // Target Hospitality location-lock: locks shipping to the customer's assigned location
-  var isTargetLocationCustomer = {{ is_target_location_customer | json }};
-  var targetLocationTag = {{ target_location_tag | json }};
-
   // Global settings loaded from API (applies to all Limit users and Manager+Extended users)
   var globalSettings = null;
 
@@ -1764,10 +1717,6 @@ document.addEventListener('DOMContentLoaded', function() {
             window.updateCartAttribute('attributes[PO Number]', globalSettings.globalPO);
           }
         }
-        // Target Hospitality: reveal card payment if this location allows it,
-        // and lock the shipping address to the customer's assigned location.
-        applyTargetLocationCardVisibility();
-        populateTargetLocationShipping();
       }
     } catch (error) {
       console.error('Error loading global settings:', error);
@@ -1819,110 +1768,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  // ===== Target Hospitality location-lock =====
-  // Normalize a location name/tag for matching: lowercase, drop a leading "TH - "
-  // prefix, and collapse whitespace. This tolerates the differences between the
-  // customer tag ("Hyperscale - Gateway Workforce Hub") and the stored location
-  // key ("TH - HyperScale - Gateway Workforce Hub").
-  function normalizeLocationName(s) {
-    return String(s == null ? '' : s)
-      .toLowerCase()
-      .replace(/^\s*th\s*-\s*/, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  // Find the saved location object for this customer's location tag, or null if
-  // the customer isn't location-locked / settings aren't loaded / no match exists.
-  function getMatchedTargetLocation() {
-    if (!isTargetLocationCustomer || !globalSettings || !globalSettings.locationsJson) return null;
-    var locations;
-    try {
-      locations = typeof globalSettings.locationsJson === 'string'
-        ? JSON.parse(globalSettings.locationsJson)
-        : globalSettings.locationsJson;
-    } catch (e) {
-      console.error('TH location-lock: could not parse locationsJson', e);
-      return null;
-    }
-    if (!locations || typeof locations !== 'object') return null;
-
-    var want = normalizeLocationName(targetLocationTag);
-    for (var key in locations) {
-      if (Object.prototype.hasOwnProperty.call(locations, key) && normalizeLocationName(key) === want) {
-        return locations[key];
-      }
-    }
-    return null;
-  }
-
-  // Prefill + lock the Pay Later shipping address to the customer's location.
-  // If no location match exists (manager hasn't configured it), the fields are
-  // left editable so the customer can still check out.
-  function populateTargetLocationShipping() {
-    var loc = getMatchedTargetLocation();
-    if (!loc) return;
-
-    var fields = {
-      'pay-later-first-name': loc.firstName,
-      'pay-later-last-name': loc.lastName,
-      'pay-later-address': loc.address,
-      'pay-later-address2': loc.address2,
-      'pay-later-city': loc.city,
-      'pay-later-province': loc.state,
-      'pay-later-zip': loc.zip,
-      'pay-later-phone': loc.phone
-    };
-    for (var id in fields) {
-      if (!Object.prototype.hasOwnProperty.call(fields, id)) continue;
-      var el = document.getElementById(id);
-      if (!el) continue;
-      el.value = fields[id] != null ? fields[id] : '';
-      // readonly (not disabled) so the value is still included in FormData on submit.
-      el.setAttribute('readonly', '');
-      el.classList.add('pay-later-input--readonly');
-    }
-
-    // Country <select>: set the value and lock by disabling the other options.
-    // (A disabled <select> would be dropped from FormData; disabling only the
-    // non-selected options keeps the field submittable while preventing changes.)
-    var countrySel = document.getElementById('pay-later-country');
-    if (countrySel) {
-      var cc = String(loc.country || '').toUpperCase();
-      var full = cc === 'CA' ? 'Canada' : (cc === 'US' || cc === 'USA') ? 'United States' : '';
-      if (full) {
-        countrySel.value = full;
-        for (var i = 0; i < countrySel.options.length; i++) {
-          countrySel.options[i].disabled = (countrySel.options[i].value !== full);
-        }
-        countrySel.classList.add('pay-later-input--readonly');
-      }
-    }
-
-    // Shipping company: reveal + fill + lock when the location has one.
-    var companyField = document.getElementById('pay-later-company');
-    var companyWrapper = document.getElementById('pay-later-shipping-company-wrapper');
-    if (companyField && loc.company) {
-      companyField.value = loc.company;
-      companyField.setAttribute('readonly', '');
-      companyField.classList.add('pay-later-input--readonly');
-      if (companyWrapper) companyWrapper.style.display = 'block';
-    }
-  }
-
-  // Reveal the card/express payment elements (rendered hidden server-side) only
-  // when the customer's location has its Card Payment toggle ON. Otherwise the
-  // customer stays Pay Later-only, matching the default Limit-customer behavior.
-  function applyTargetLocationCardVisibility() {
-    if (!isTargetLocationCustomer) return;
-    var loc = getMatchedTargetLocation();
-    if (!loc || loc.cardPayment !== true) return;
-    var cardEls = document.querySelectorAll('.th-card-only');
-    for (var i = 0; i < cardEls.length; i++) {
-      cardEls[i].style.display = '';
-    }
-  }
-
   // Load global settings on page load for limited and Manager+Extended customers
   if (isLimitedCustomer || isManagerExtended) {
     loadGlobalSettings();
@@ -1941,8 +1786,6 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       // Auto-populate billing address for limited and Manager+Extended customers
       populateLimitedCustomerBillingAddress();
-      // Target Hospitality: prefill + lock shipping to the customer's assigned location
-      populateTargetLocationShipping();
     });
   }
 
