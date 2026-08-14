@@ -141,52 +141,58 @@
     {%- if show_target_locations -%}
     <div class="settings-section" id="locations-settings-section">
       <h3 class="settings-section-title">Locations</h3>
-      <p class="settings-section-description">Billing uses the universal Global Billing Address above. Set each location&rsquo;s shipping address and toggle Card Payment on or off, then save that location.</p>
+      <p class="settings-section-description">Billing uses the universal Global Billing Address above. Set each location&rsquo;s full shipping address and toggle Card Payment on or off, then save that location.</p>
+
+      <div class="locations-search">
+        <input type="text" id="locations-search-input" class="locations-search-input" placeholder="Search locations by name, city, state&hellip;" aria-label="Search locations" autocomplete="off">
+      </div>
 
       <div id="target-locations-list" class="locations-list">
         <div class="dashboard-loading">Loading locations&hellip;</div>
       </div>
 
+      <div id="locations-empty" class="dashboard-empty" style="display: none;">No locations match your search.</div>
+
       {%- comment -%} Default location list — used as the seed; saved overrides (address + toggle) are merged on load. {%- endcomment -%}
       <script type="application/json" id="target-locations-defaults">
 [
-  { "name": "TH - General - Coporate Office", "address": "9320 Lakeside Blvd, Suite 300", "city": "The Woodlands", "state": "Texas", "zip": "77381" },
-  { "name": "TH - General - Permian Regional Office", "address": "12308 W Hwy 80 E", "city": "Odessa", "state": "TX", "zip": "79765" },
-  { "name": "TH - Hospitality - Big Spring Lodge", "address": "5101 E. Midway Road", "city": "Big Spring", "state": "TX", "zip": "79720" },
-  { "name": "TH - Hospitality - Carlsbad Lodge", "address": "4018 Iron Horse Drive", "city": "Carlsbad", "state": "NM", "zip": "88220" },
-  { "name": "TH - Hospitality - Cheecham Lodge", "address": "PO Box 5447", "city": "Fort McMurray", "state": "Alberta", "zip": "T9H 3G4" },
-  { "name": "TH - Hospitality - Jal Lodge", "address": "218 Whitworth Drive", "city": "Jal", "state": "NM", "zip": "88252" },
-  { "name": "TH - Hospitality - Kermit North Lodge", "address": "514 E. Dallas Avenue", "city": "Kermit", "state": "TX", "zip": "79745" },
-  { "name": "TH - Hospitality - Kermit South Lodge", "address": "549 E. Highway 115", "city": "Kermit", "state": "TX", "zip": "79745" },
-  { "name": "TH - Hospitality - Mentone Wolfcamp Lodge", "address": "991 County Road 300", "city": "Mentone", "state": "TX", "zip": "79754" },
-  { "name": "TH - Hospitality - Midland East Lodge", "address": "7612 E County Rd 79", "city": "Midland", "state": "TX", "zip": "79706" },
-  { "name": "TH - Hospitality - Midland Lodge", "address": "11508 W County Rd 33", "city": "Midland", "state": "TX", "zip": "79707" },
-  { "name": "TH - Hospitality - New Frontier RV Park", "address": "4360 Rim Rock Road", "city": "Winnemucca", "state": "NV", "zip": "89445" },
-  { "name": "TH - Hospitality - Odessa East Lodge", "address": "2575 East Pearl St", "city": "Odessa", "state": "TX", "zip": "79761" },
-  { "name": "TH - Hospitality - Odessa West Lodge", "address": "16531 Interstate 20", "city": "Odessa", "state": "Texas", "zip": "79763" },
-  { "name": "TH - Hospitality - Orla El Capitan Lodge", "address": "16600 FM 652", "city": "Orla", "state": "TX", "zip": "79770" },
-  { "name": "TH - Hospitality - Orla North Lodge", "address": "52 FM 652 W", "city": "Orla", "state": "TX", "zip": "79770" },
-  { "name": "TH - Hospitality - Orla South Lodge", "address": "69 FM 652 West", "city": "Orla", "state": "TX", "zip": "79770" },
-  { "name": "TH - Hospitality - Pecos RV Park", "address": "470 FM 1450", "city": "Pecos", "state": "TX", "zip": "79772" },
-  { "name": "TH - Hospitality - Powder River Lodge", "address": "1000 Fergy Ln #596", "city": "Gillette", "state": "WY", "zip": "82718" },
-  { "name": "TH - Hospitality - Seven Rivers Lodge", "address": "3401 Boyd Drive", "city": "Carlsbad", "state": "NM", "zip": "88220" },
-  { "name": "TH - Hospitality - Skillman Lodge", "address": "4393 County Road 300", "city": "Mentone", "state": "TX", "zip": "79754" },
-  { "name": "TH - Hospitality - Thacker Pass WFH", "address": "6500 Winnemucca Blvd", "city": "Winnemucca", "state": "NV", "zip": "89445" },
-  { "name": "TH - Hospitality - Watford City Lodge", "address": "2509 14th St NW", "city": "Watford City", "state": "ND", "zip": "58854" },
-  { "name": "TH - Hospitality - Williams County Lodge", "address": "4905 146th Dr NW", "city": "Williston", "state": "ND", "zip": "58801" },
-  { "name": "TH - HyperScale - Gateway Workforce Hub", "address": "880 FM 2363", "city": "Quanah", "state": "TX", "zip": "79252" },
-  { "name": "TH - HyperScale - Jackrabbit Flats", "address": "63 County Road 118", "city": "Pecos", "state": "TX", "zip": "79772" },
-  { "name": "TH - HyperScale - Patton Springs WFH", "address": "990 W. FM 193", "city": "Afton", "state": "TX", "zip": "79220" },
-  { "name": "TH - HyperScale - Pecos North WFH", "address": "2310 S. Teague Drive", "city": "Pecos", "state": "TX", "zip": "79772" },
-  { "name": "TH - HyperScale - Pecos South WFH", "address": "23 County Road 116", "city": "Pecos", "state": "TX", "zip": "79772" },
-  { "name": "TH - HyperScale - Pecos West WFH", "address": "2237 Business Loop I-20 West", "city": "Pecos", "state": "TX", "zip": "79772" },
-  { "name": "TH - HyperScale - Red River Rise Lodge", "address": "6100 CR 111 South", "city": "Vernon", "state": "TX", "zip": "76384" }
+  { "name": "TH - General - Coporate Office", "address": "9320 Lakeside Blvd, Suite 300", "city": "The Woodlands", "state": "Texas", "zip": "77381", "country": "US" },
+  { "name": "TH - General - Permian Regional Office", "address": "12308 W Hwy 80 E", "city": "Odessa", "state": "TX", "zip": "79765", "country": "US" },
+  { "name": "TH - Hospitality - Big Spring Lodge", "address": "5101 E. Midway Road", "city": "Big Spring", "state": "TX", "zip": "79720", "country": "US" },
+  { "name": "TH - Hospitality - Carlsbad Lodge", "address": "4018 Iron Horse Drive", "city": "Carlsbad", "state": "NM", "zip": "88220", "country": "US" },
+  { "name": "TH - Hospitality - Cheecham Lodge", "address": "PO Box 5447", "city": "Fort McMurray", "state": "Alberta", "zip": "T9H 3G4", "country": "CA" },
+  { "name": "TH - Hospitality - Jal Lodge", "address": "218 Whitworth Drive", "city": "Jal", "state": "NM", "zip": "88252", "country": "US" },
+  { "name": "TH - Hospitality - Kermit North Lodge", "address": "514 E. Dallas Avenue", "city": "Kermit", "state": "TX", "zip": "79745", "country": "US" },
+  { "name": "TH - Hospitality - Kermit South Lodge", "address": "549 E. Highway 115", "city": "Kermit", "state": "TX", "zip": "79745", "country": "US" },
+  { "name": "TH - Hospitality - Mentone Wolfcamp Lodge", "address": "991 County Road 300", "city": "Mentone", "state": "TX", "zip": "79754", "country": "US" },
+  { "name": "TH - Hospitality - Midland East Lodge", "address": "7612 E County Rd 79", "city": "Midland", "state": "TX", "zip": "79706", "country": "US" },
+  { "name": "TH - Hospitality - Midland Lodge", "address": "11508 W County Rd 33", "city": "Midland", "state": "TX", "zip": "79707", "country": "US" },
+  { "name": "TH - Hospitality - New Frontier RV Park", "address": "4360 Rim Rock Road", "city": "Winnemucca", "state": "NV", "zip": "89445", "country": "US" },
+  { "name": "TH - Hospitality - Odessa East Lodge", "address": "2575 East Pearl St", "city": "Odessa", "state": "TX", "zip": "79761", "country": "US" },
+  { "name": "TH - Hospitality - Odessa West Lodge", "address": "16531 Interstate 20", "city": "Odessa", "state": "Texas", "zip": "79763", "country": "US" },
+  { "name": "TH - Hospitality - Orla El Capitan Lodge", "address": "16600 FM 652", "city": "Orla", "state": "TX", "zip": "79770", "country": "US" },
+  { "name": "TH - Hospitality - Orla North Lodge", "address": "52 FM 652 W", "city": "Orla", "state": "TX", "zip": "79770", "country": "US" },
+  { "name": "TH - Hospitality - Orla South Lodge", "address": "69 FM 652 West", "city": "Orla", "state": "TX", "zip": "79770", "country": "US" },
+  { "name": "TH - Hospitality - Pecos RV Park", "address": "470 FM 1450", "city": "Pecos", "state": "TX", "zip": "79772", "country": "US" },
+  { "name": "TH - Hospitality - Powder River Lodge", "address": "1000 Fergy Ln #596", "city": "Gillette", "state": "WY", "zip": "82718", "country": "US" },
+  { "name": "TH - Hospitality - Seven Rivers Lodge", "address": "3401 Boyd Drive", "city": "Carlsbad", "state": "NM", "zip": "88220", "country": "US" },
+  { "name": "TH - Hospitality - Skillman Lodge", "address": "4393 County Road 300", "city": "Mentone", "state": "TX", "zip": "79754", "country": "US" },
+  { "name": "TH - Hospitality - Thacker Pass WFH", "address": "6500 Winnemucca Blvd", "city": "Winnemucca", "state": "NV", "zip": "89445", "country": "US" },
+  { "name": "TH - Hospitality - Watford City Lodge", "address": "2509 14th St NW", "city": "Watford City", "state": "ND", "zip": "58854", "country": "US" },
+  { "name": "TH - Hospitality - Williams County Lodge", "address": "4905 146th Dr NW", "city": "Williston", "state": "ND", "zip": "58801", "country": "US" },
+  { "name": "TH - HyperScale - Gateway Workforce Hub", "address": "880 FM 2363", "city": "Quanah", "state": "TX", "zip": "79252", "country": "US" },
+  { "name": "TH - HyperScale - Jackrabbit Flats", "address": "63 County Road 118", "city": "Pecos", "state": "TX", "zip": "79772", "country": "US" },
+  { "name": "TH - HyperScale - Patton Springs WFH", "address": "990 W. FM 193", "city": "Afton", "state": "TX", "zip": "79220", "country": "US" },
+  { "name": "TH - HyperScale - Pecos North WFH", "address": "2310 S. Teague Drive", "city": "Pecos", "state": "TX", "zip": "79772", "country": "US" },
+  { "name": "TH - HyperScale - Pecos South WFH", "address": "23 County Road 116", "city": "Pecos", "state": "TX", "zip": "79772", "country": "US" },
+  { "name": "TH - HyperScale - Pecos West WFH", "address": "2237 Business Loop I-20 West", "city": "Pecos", "state": "TX", "zip": "79772", "country": "US" },
+  { "name": "TH - HyperScale - Red River Rise Lodge", "address": "6100 CR 111 South", "city": "Vernon", "state": "TX", "zip": "76384", "country": "US" }
 ]
       </script>
     </div>
     {%- endif -%}
 
-    {%- unless is_bls_manager or is_akima_manager -%}
+    {%- unless is_bls_manager or is_akima_manager or is_target_manager -%}
     <div class="settings-section">
       <h3 class="settings-section-title">Email Notifications</h3>
       <p class="settings-section-description">Order confirmations and notifications will be sent to these addresses.</p>
@@ -349,9 +355,29 @@
     gap: 20px;
   }
 
+  .locations-search {
+    margin-bottom: 16px;
+  }
+
+  .locations-search-input {
+    width: 100%;
+    max-width: 360px;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+    background-color: #fff;
+  }
+
+  .locations-search-input:focus {
+    outline: none;
+    border-color: #4CAF50;
+  }
+
   .location-address-fields {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: repeat(6, 1fr);
     gap: 12px 14px;
   }
 
@@ -364,6 +390,14 @@
     grid-column: 1 / -1;
   }
 
+  .location-field--span3 {
+    grid-column: span 3;
+  }
+
+  .location-field--span2 {
+    grid-column: span 2;
+  }
+
   .location-field label {
     font-size: 12px;
     font-weight: 500;
@@ -371,7 +405,8 @@
     margin-bottom: 4px;
   }
 
-  .location-field input {
+  .location-field input,
+  .location-field select {
     width: 100%;
     padding: 8px 10px;
     border: 1px solid #ddd;
@@ -381,7 +416,8 @@
     background-color: #fff;
   }
 
-  .location-field input:focus {
+  .location-field input:focus,
+  .location-field select:focus {
     outline: none;
     border-color: #4CAF50;
   }
@@ -483,6 +519,10 @@
 
     .location-address-fields {
       grid-template-columns: 1fr;
+    }
+
+    .location-address-fields > .location-field {
+      grid-column: 1 / -1;
     }
   }
 </style>
@@ -643,8 +683,31 @@
   // In-memory state: [{ name, address, city, state, zip, cardPayment }]. Seeded
   // from the defaults <script> block; overridden by saved settings
   // (settings.locationsJson) on load. Billing is universal (Global Billing
-  // Address); shipping is per-location, split into address/city/state/zip.
+  // Address); shipping is per-location, split into full address fields.
   var locationsState = [];
+
+  // Mirrors the Global Billing Address country dropdown.
+  var LOCATION_COUNTRY_OPTIONS = [
+    { value: '', label: 'Select Country' },
+    { value: 'US', label: 'United States' },
+    { value: 'CA', label: 'Canada' },
+    { value: 'MX', label: 'Mexico' },
+    { value: 'GB', label: 'United Kingdom' },
+    { value: 'AU', label: 'Australia' },
+    { value: 'DE', label: 'Germany' },
+    { value: 'FR', label: 'France' },
+    { value: 'IT', label: 'Italy' },
+    { value: 'ES', label: 'Spain' },
+    { value: 'NL', label: 'Netherlands' },
+    { value: 'BE', label: 'Belgium' },
+    { value: 'AT', label: 'Austria' },
+    { value: 'CH', label: 'Switzerland' },
+    { value: 'JP', label: 'Japan' },
+    { value: 'CN', label: 'China' },
+    { value: 'IN', label: 'India' },
+    { value: 'BR', label: 'Brazil' },
+    { value: 'AR', label: 'Argentina' }
+  ];
 
   function initTargetLocations() {
     const list = document.getElementById('target-locations-list');
@@ -661,15 +724,24 @@
     locationsState = defaults.map(function (d) {
       return {
         name: d.name,
+        firstName: d.firstName || '',
+        lastName: d.lastName || '',
+        company: d.company || '',
         address: d.address || '',
+        address2: d.address2 || '',
         city: d.city || '',
         state: d.state || '',
         zip: d.zip || '',
+        country: d.country || '',
+        phone: d.phone || '',
         cardPayment: true
       };
     });
 
     renderLocations();
+
+    const searchInput = document.getElementById('locations-search-input');
+    if (searchInput) searchInput.addEventListener('input', filterLocations);
   }
 
   function renderLocations() {
@@ -691,26 +763,46 @@
       const fieldsGrid = document.createElement('div');
       fieldsGrid.className = 'location-address-fields';
 
-      function addField(labelText, cls, value, isFull) {
+      function addField(labelText, cls, value, spanClass, type) {
         const group = document.createElement('div');
-        group.className = 'location-field' + (isFull ? ' location-field--full' : '');
+        group.className = 'location-field' + (spanClass ? ' ' + spanClass : '');
         const lab = document.createElement('label');
         lab.textContent = labelText;
-        const inp = document.createElement('input');
-        inp.type = 'text';
-        inp.className = cls;
-        inp.value = value || '';
-        inp.setAttribute('aria-label', labelText + ' for ' + loc.name);
+
+        let field;
+        if (type === 'select') {
+          field = document.createElement('select');
+          LOCATION_COUNTRY_OPTIONS.forEach(function (opt) {
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = opt.label;
+            if (opt.value === (value || '')) o.selected = true;
+            field.appendChild(o);
+          });
+        } else {
+          field = document.createElement('input');
+          field.type = 'text';
+          field.value = value || '';
+        }
+        field.className = cls;
+        field.setAttribute('aria-label', labelText + ' for ' + loc.name);
+
         group.appendChild(lab);
-        group.appendChild(inp);
+        group.appendChild(field);
         fieldsGrid.appendChild(group);
-        return inp;
+        return field;
       }
 
-      addField('Address', 'location-address-input', loc.address, true);
-      addField('City', 'location-city-input', loc.city, false);
-      addField('State', 'location-state-input', loc.state, false);
-      addField('Zip Code', 'location-zip-input', loc.zip, false);
+      addField('First Name', 'location-first-input', loc.firstName, 'location-field--span3');
+      addField('Last Name', 'location-last-input', loc.lastName, 'location-field--span3');
+      addField('Company', 'location-company-input', loc.company, 'location-field--full');
+      addField('Address', 'location-address-input', loc.address, 'location-field--full');
+      addField('Address 2', 'location-address2-input', loc.address2, 'location-field--full');
+      addField('City', 'location-city-input', loc.city, 'location-field--span2');
+      addField('State/Province', 'location-state-input', loc.state, 'location-field--span2');
+      addField('Zip/Postal Code', 'location-zip-input', loc.zip, 'location-field--span2');
+      addField('Country', 'location-country-input', loc.country, 'location-field--span3', 'select');
+      addField('Phone', 'location-phone-input', loc.phone, 'location-field--span3');
 
       addrWrap.appendChild(fieldsGrid);
 
@@ -759,6 +851,31 @@
       row.appendChild(addrWrap);
       list.appendChild(row);
     });
+
+    // Re-apply any active search filter after a full re-render
+    filterLocations();
+  }
+
+  // Live substring search across each location's name and every field value.
+  function filterLocations() {
+    const input = document.getElementById('locations-search-input');
+    const list = document.getElementById('target-locations-list');
+    if (!list) return;
+    const q = (input ? input.value : '').toLowerCase().trim();
+
+    let visible = 0;
+    list.querySelectorAll('.location-row').forEach(function (row) {
+      let haystack = row.querySelector('.location-name').textContent.toLowerCase();
+      row.querySelectorAll('input[type="text"], select').forEach(function (f) {
+        haystack += ' ' + (f.value || '').toLowerCase();
+      });
+      const match = !q || haystack.indexOf(q) !== -1;
+      row.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+
+    const empty = document.getElementById('locations-empty');
+    if (empty) empty.style.display = (visible === 0) ? 'block' : 'none';
   }
 
   function applyLocationOverrides(raw) {
@@ -775,10 +892,16 @@
     locationsState.forEach(function (loc) {
       const o = overrides[loc.name];
       if (o && typeof o === 'object') {
+        if (typeof o.firstName === 'string') loc.firstName = o.firstName;
+        if (typeof o.lastName === 'string') loc.lastName = o.lastName;
+        if (typeof o.company === 'string') loc.company = o.company;
         if (typeof o.address === 'string') loc.address = o.address;
+        if (typeof o.address2 === 'string') loc.address2 = o.address2;
         if (typeof o.city === 'string') loc.city = o.city;
         if (typeof o.state === 'string') loc.state = o.state;
         if (typeof o.zip === 'string') loc.zip = o.zip;
+        if (typeof o.country === 'string') loc.country = o.country;
+        if (typeof o.phone === 'string') loc.phone = o.phone;
         // Legacy single-line saves (shippingAddress) fall back into the Address field
         if (o.address == null && typeof o.shippingAddress === 'string') loc.address = o.shippingAddress;
         if (typeof o.cardPayment === 'boolean') loc.cardPayment = o.cardPayment;
@@ -797,10 +920,16 @@
     list.querySelectorAll('.location-row').forEach(function (row) {
       const i = parseInt(row.dataset.index, 10);
       if (isNaN(i) || !locationsState[i]) return;
+      locationsState[i].firstName = row.querySelector('.location-first-input').value;
+      locationsState[i].lastName = row.querySelector('.location-last-input').value;
+      locationsState[i].company = row.querySelector('.location-company-input').value;
       locationsState[i].address = row.querySelector('.location-address-input').value;
+      locationsState[i].address2 = row.querySelector('.location-address2-input').value;
       locationsState[i].city = row.querySelector('.location-city-input').value;
       locationsState[i].state = row.querySelector('.location-state-input').value;
       locationsState[i].zip = row.querySelector('.location-zip-input').value;
+      locationsState[i].country = row.querySelector('.location-country-input').value;
+      locationsState[i].phone = row.querySelector('.location-phone-input').value;
       locationsState[i].cardPayment = row.querySelector('.location-card-payment').checked;
     });
   }
@@ -809,10 +938,16 @@
     const out = {};
     locationsState.forEach(function (loc) {
       out[loc.name] = {
+        firstName: loc.firstName,
+        lastName: loc.lastName,
+        company: loc.company,
         address: loc.address,
+        address2: loc.address2,
         city: loc.city,
         state: loc.state,
         zip: loc.zip,
+        country: loc.country,
+        phone: loc.phone,
         cardPayment: loc.cardPayment
       };
     });
