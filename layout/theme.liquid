@@ -170,5 +170,8 @@ NOTE TO DEVELOPERS: welcome to Focal theme! We hope that you will enjoy editing 
     {%- if request.page_type == 'collection' -%}
       {%- render 'location-pin' -%}
     {%- endif -%}
+
+    {%- comment -%}One-location-per-cart silo for Target Hospitality customers (all pages){%- endcomment -%}
+    {%- render 'location-silo' -%}
   </body>
 </html>

@@ -12,9 +12,22 @@
   against the saved locations before it is written, so non-location "th-" collections
   never overwrite an existing pin.
 {%- endcomment -%}
+{%- comment -%}
+  Target Hospitality customers are handled by location-silo.liquid (one location per
+  cart, first-wins). Only non-TH shoppers get this latest-wins auto-pin.
+{%- endcomment -%}
+{%- assign pin_is_th = false -%}
+{%- if customer -%}
+  {%- for tag in customer.tags -%}
+    {%- if tag | downcase | strip == 'target hospitality' -%}
+      {%- assign pin_is_th = true -%}
+      {%- break -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
 {%- assign loc_handle = collection.handle -%}
 {%- assign loc_prefix = loc_handle | slice: 0, 3 -%}
-{%- if loc_prefix == 'th-' -%}
+{%- if loc_prefix == 'th-' and pin_is_th == false -%}
 <script>
   (function () {
     var handle = {{ loc_handle | json }};

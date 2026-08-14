@@ -1,0 +1,169 @@
+{%- comment -%}
+  Target Hospitality cart silo
+
+  A TH-tagged customer can only have items from ONE location collection in their cart
+  at a time. Adding an item from a different location than the cart's pinned one is
+  blocked with a prompt to check out or clear the cart (first-wins).
+
+  Non-TH shoppers are unaffected and keep the latest-wins behavior in location-pin.liquid.
+
+  Rendered globally (all pages) so it covers add-to-cart from product pages, quick-buy
+  on listings, etc. The "location being ordered from" comes from the collection context
+  (collection.handle on collection pages and /collections/x/products/y product pages).
+{%- endcomment -%}
+{%- assign _is_th = false -%}
+{%- if customer -%}
+  {%- for tag in customer.tags -%}
+    {%- assign _t = tag | downcase | strip -%}
+    {%- if _t == 'target hospitality' -%}
+      {%- assign _is_th = true -%}
+      {%- break -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+{%- if _is_th -%}
+  {%- assign _loc_handle = '' -%}
+  {%- assign _loc_title = '' -%}
+  {%- if collection and collection.handle -%}
+    {%- assign _hp = collection.handle | slice: 0, 3 -%}
+    {%- if _hp == 'th-' -%}
+      {%- assign _loc_handle = collection.handle -%}
+      {%- assign _loc_title = collection.title -%}
+    {%- endif -%}
+  {%- endif -%}
+<script>
+(function () {
+  var currentLocationHandle = {{ _loc_handle | json }};
+  var currentLocationTitle = {{ _loc_title | json }};
+
+  // Cached cart snapshot so the silo decision in the submit handler is synchronous.
+  var cart = { item_count: 0, location: '', locationName: '' };
+  var pendingForm = null;
+  var modalEl = null;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+  // Fallback display name when a saved Location Name isn't present (older carts).
+  function deslug(h) {
+    return String(h || '').replace(/^th-/, '').replace(/-/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+  function locName(handle, name) { return name || deslug(handle); }
+
+  function applyCart(c) {
+    cart.item_count = c.item_count || 0;
+    cart.location = (c.attributes && c.attributes['Location']) || '';
+    cart.locationName = (c.attributes && c.attributes['Location Name']) || '';
+  }
+
+  function refreshCart() {
+    fetch('/cart.js').then(function (r) { return r.json(); }).then(applyCart).catch(function () {});
+  }
+
+  // Persist the pinned location on the cart (first-wins) so the cart page reads it too.
+  function setCartLocation(handle, title) {
+    var fd = new FormData();
+    fd.append('attributes[Location]', handle);
+    fd.append('attributes[Location Name]', title || '');
+    fetch('/cart/update.js', { method: 'POST', body: fd }).catch(function () {});
+  }
+
+  // Capture-phase submit listener: runs before the product form's own handler, so
+  // stopImmediatePropagation() prevents the add when there's a location conflict.
+  document.addEventListener('submit', function (event) {
+    var form = event.target;
+    if (!form || form.getAttribute('is') !== 'product-form') return;
+
+    // Conflict: cart is pinned to a different location than the one being ordered from.
+    if (cart.item_count > 0 && cart.location && currentLocationHandle && currentLocationHandle !== cart.location) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      pendingForm = form;
+      showSiloModal();
+      return;
+    }
+
+    // First add from a location context on an unpinned cart: lock the silo (optimistic +
+    // persisted) so a rapid follow-up add from a different location is caught.
+    if (!cart.location && currentLocationHandle) {
+      cart.location = currentLocationHandle;
+      cart.locationName = currentLocationTitle;
+      setCartLocation(currentLocationHandle, currentLocationTitle);
+    }
+  }, true);
+
+  function showSiloModal() {
+    if (modalEl) { modalEl.parentNode && modalEl.parentNode.removeChild(modalEl); modalEl = null; }
+    var fromName = locName(cart.location, cart.locationName);
+    var toName = locName(currentLocationHandle, currentLocationTitle);
+
+    var overlay = document.createElement('div');
+    overlay.setAttribute('style', 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;');
+
+    var box = document.createElement('div');
+    box.setAttribute('style', 'background:#fff;border-radius:10px;max-width:440px;width:100%;padding:26px;box-shadow:0 10px 40px rgba(0,0,0,.2);font-family:inherit;');
+    box.innerHTML =
+      '<h3 style="margin:0 0 10px;font-size:18px;">One location per order</h3>' +
+      '<p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.5;">Your cart has items for <strong>' + esc(fromName) +
+      '</strong>. To order for <strong>' + esc(toName) + '</strong>, check out first or clear your cart.</p>';
+
+    var actions = document.createElement('div');
+    actions.setAttribute('style', 'display:flex;gap:10px;flex-wrap:wrap;');
+
+    var checkoutBtn = document.createElement('button');
+    checkoutBtn.type = 'button';
+    checkoutBtn.textContent = 'Go to checkout';
+    checkoutBtn.setAttribute('style', 'flex:1;min-width:150px;padding:11px 14px;border:none;border-radius:6px;background:#ac262c;color:#fff;font-size:14px;cursor:pointer;');
+    checkoutBtn.addEventListener('click', function () { window.location.href = '/cart'; });
+
+    var clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.textContent = 'Clear cart & switch';
+    clearBtn.setAttribute('style', 'flex:1;min-width:150px;padding:11px 14px;border:1px solid #ccc;border-radius:6px;background:#fff;color:#333;font-size:14px;cursor:pointer;');
+    clearBtn.addEventListener('click', clearAndSwitch);
+
+    actions.appendChild(checkoutBtn);
+    actions.appendChild(clearBtn);
+    box.appendChild(actions);
+
+    overlay.appendChild(box);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) hideModal(); });
+    document.body.appendChild(overlay);
+    modalEl = overlay;
+  }
+
+  function hideModal() {
+    if (modalEl && modalEl.parentNode) modalEl.parentNode.removeChild(modalEl);
+    modalEl = null;
+  }
+
+  function clearAndSwitch() {
+    fetch('/cart/clear.js', { method: 'POST' }).then(function (r) { return r.json(); }).then(function () {
+      cart.item_count = 0;
+      cart.location = '';
+      cart.locationName = '';
+      hideModal();
+      if (pendingForm) {
+        var f = pendingForm;
+        pendingForm = null;
+        // Cart is empty now, so the silo allows this add; the optimistic branch re-pins.
+        if (f.requestSubmit) { f.requestSubmit(); }
+        else { f.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }
+      }
+    }).catch(function () { hideModal(); });
+  }
+
+  // Keep the cached cart in sync as it changes.
+  document.documentElement.addEventListener('cart:updated', function (e) {
+    if (e.detail && e.detail.cart) applyCart(e.detail.cart); else refreshCart();
+  });
+  document.documentElement.addEventListener('cart:refresh', function (e) {
+    if (e.detail && e.detail.cart) applyCart(e.detail.cart); else refreshCart();
+  });
+
+  refreshCart();
+})();
+</script>
+{%- endif -%}
