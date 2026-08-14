@@ -3,12 +3,14 @@
 {%- assign is_bulk_order_customer = false -%}
 {%- assign is_akima_customer = false -%}
 {%- assign is_manager_extended = false -%}
+{%- assign is_target_manager_extended = false -%}
 {%- if customer -%}
   {%- assign has_limit_tag = false -%}
   {%- assign has_bls_tag = false -%}
   {%- assign has_akima_tag = false -%}
   {%- assign has_manager_tag = false -%}
   {%- assign has_extended_tag = false -%}
+  {%- assign has_target_tag = false -%}
   {%- for tag in customer.tags -%}
     {%- assign tag_lower = tag | downcase | strip -%}
     {%- if tag_lower == 'limit' -%}
@@ -26,6 +28,9 @@
     {%- if tag_lower == 'extended' -%}
       {%- assign has_extended_tag = true -%}
     {%- endif -%}
+    {%- if tag_lower == 'target hospitality' -%}
+      {%- assign has_target_tag = true -%}
+    {%- endif -%}
   {%- endfor -%}
   {%- if has_limit_tag -%}
     {%- assign is_limited_customer = true -%}
@@ -38,6 +43,9 @@
   {%- endif -%}
   {%- if has_manager_tag and has_extended_tag -%}
     {%- assign is_manager_extended = true -%}
+  {%- endif -%}
+  {%- if has_manager_tag and has_extended_tag and has_target_tag -%}
+    {%- assign is_target_manager_extended = true -%}
   {%- endif -%}
   {%- assign has_akima_company_tag = false -%}
   {%- for tag in customer.tags -%}
@@ -533,7 +541,7 @@
                   >{{ cart.note }}</textarea>
                 </div>
 
-                {%- unless is_bulk_order_customer or has_akima_tag -%}
+                {%- unless is_bulk_order_customer or has_akima_tag or is_target_manager_extended -%}
                 <div class="cart-attributes__field cart-attributes__field--po">
                   <label class="cart-attributes__label" for="cart-po-number">
                     PO Number{% if is_limited_customer %} <span class="cart-attributes__readonly-badge">(Auto-filled)</span>{% endif %}
