@@ -1,0 +1,60 @@
+{%- comment -%}
+  Location pin (Target Hospitality)
+
+  When a customer is viewing a location collection (handle like
+  "th-hospitality-big-spring-lodge"), record that location on the cart as the
+  `Location` attribute. The cart reads this attribute to:
+    - gate credit-card payment (per-location Card Payment toggle), and
+    - auto-fill + lock the Pay Later shipping address from the location's saved settings.
+
+  Latest-wins: each location collection the customer orders in overwrites the pin.
+  Only runs on collections whose handle starts with "th-", and the handle is validated
+  against the saved locations before it is written, so non-location "th-" collections
+  never overwrite an existing pin.
+{%- endcomment -%}
+{%- assign loc_handle = collection.handle -%}
+{%- assign loc_prefix = loc_handle | slice: 0, 3 -%}
+{%- if loc_prefix == 'th-' -%}
+<script>
+  (function () {
+    var handle = {{ loc_handle | json }};
+    if (!handle) return;
+
+    // Mirror Shopify's handle generation so a location name maps to its collection handle.
+    function slugifyLocation(s) {
+      return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    }
+
+    fetch('https://image-first-portal.netlify.app/.netlify/functions/get-global-settings?company=target-hospitality')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data || !data.settings || !data.settings.locationsJson) return;
+        var locations;
+        try {
+          locations = typeof data.settings.locationsJson === 'string'
+            ? JSON.parse(data.settings.locationsJson) : data.settings.locationsJson;
+        } catch (e) { return; }
+        if (!locations || typeof locations !== 'object') return;
+
+        // Only pin if this collection handle matches a real saved location.
+        var matches = false;
+        for (var key in locations) {
+          if (Object.prototype.hasOwnProperty.call(locations, key) && slugifyLocation(key) === handle) {
+            matches = true;
+            break;
+          }
+        }
+        if (!matches) return;
+
+        // Latest-wins: overwrite any previously pinned location with this one.
+        var fd = new FormData();
+        fd.append('attributes[Location]', handle);
+        fetch('/cart/update.js', { method: 'POST', body: fd })
+          .then(function (res) { return res.json(); })
+          .then(function () { console.log('[location-pin] pinned', handle); })
+          .catch(function (e) { console.error('[location-pin] failed to set attribute', e); });
+      })
+      .catch(function (e) { console.error('[location-pin] settings fetch failed', e); });
+  })();
+</script>
+{%- endif -%}

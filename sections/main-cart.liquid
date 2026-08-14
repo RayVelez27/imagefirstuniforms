@@ -1614,6 +1614,11 @@ document.addEventListener('DOMContentLoaded', function() {
   var isAkimaCompanyCustomer = {{ is_akima_company_customer | json }};
   var isManagerExtended = {{ is_manager_extended | json }};
 
+  // Location pinned to the cart from the collection the customer ordered in (Target Hospitality).
+  // Drives credit-card availability and Pay Later shipping for this cart.
+  var pinnedLocationHandle = {{ cart.attributes['Location'] | json }};
+  var pinnedLocation = null;
+
   // Global settings loaded from API (applies to all Limit users and Manager+Extended users)
   var globalSettings = null;
 
@@ -1768,10 +1773,112 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
+  // ===== Pinned location (Target Hospitality collection) =====
+  // Mirror Shopify's handle generation so a saved location name maps to its collection handle.
+  function slugifyLocation(s) {
+    return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  // Resolve the pinned collection handle to a saved location, then apply card visibility.
+  // Runs for any customer; a no-op when the cart has no pinned location.
+  async function initPinnedLocation() {
+    if (!pinnedLocationHandle) return;
+    try {
+      var resp = await fetch('https://image-first-portal.netlify.app/.netlify/functions/get-global-settings?company=target-hospitality');
+      var data = await resp.json();
+      if (!data || !data.settings || !data.settings.locationsJson) return;
+      var locations;
+      try {
+        locations = typeof data.settings.locationsJson === 'string'
+          ? JSON.parse(data.settings.locationsJson) : data.settings.locationsJson;
+      } catch (e) {
+        console.error('Pinned location: could not parse locationsJson', e);
+        return;
+      }
+      if (!locations || typeof locations !== 'object') return;
+
+      for (var key in locations) {
+        if (Object.prototype.hasOwnProperty.call(locations, key) && slugifyLocation(key) === pinnedLocationHandle) {
+          pinnedLocation = locations[key];
+          break;
+        }
+      }
+      if (!pinnedLocation) return;
+      applyPinnedLocationCard();
+    } catch (e) {
+      console.error('Error loading pinned location:', e);
+    }
+  }
+
+  // Card Payment toggle OFF for this location -> hide card / express / payment icons
+  // so only Pay Later remains. Toggle ON (or unset-but-true) leaves the default UI.
+  function applyPinnedLocationCard() {
+    if (!pinnedLocation || pinnedLocation.cardPayment === true) return;
+    document.querySelectorAll('.cart__checkout-button').forEach(function (el) { el.style.display = 'none'; });
+    document.querySelectorAll('.additional-checkout-buttons').forEach(function (el) {
+      var block = el.closest('.cart__recap-block');
+      (block || el).style.display = 'none';
+    });
+    var pm = document.querySelector('.cart__payment-methods');
+    if (pm) pm.style.display = 'none';
+  }
+
+  // Prefill + lock (readonly) the Pay Later shipping address to the pinned location.
+  function populatePinnedLocationShipping() {
+    if (!pinnedLocation) return;
+    var loc = pinnedLocation;
+    var fields = {
+      'pay-later-first-name': loc.firstName,
+      'pay-later-last-name': loc.lastName,
+      'pay-later-address': loc.address,
+      'pay-later-address2': loc.address2,
+      'pay-later-city': loc.city,
+      'pay-later-province': loc.state,
+      'pay-later-zip': loc.zip,
+      'pay-later-phone': loc.phone
+    };
+    for (var id in fields) {
+      if (!Object.prototype.hasOwnProperty.call(fields, id)) continue;
+      var el = document.getElementById(id);
+      if (!el) continue;
+      el.value = fields[id] != null ? fields[id] : '';
+      // readonly (not disabled) so the value is still included in FormData on submit.
+      el.setAttribute('readonly', '');
+      el.classList.add('pay-later-input--readonly');
+    }
+
+    // Country <select>: set value + lock by disabling the other options (keeps it in FormData).
+    var countrySel = document.getElementById('pay-later-country');
+    if (countrySel) {
+      var cc = String(loc.country || '').toUpperCase();
+      var full = cc === 'CA' ? 'Canada' : (cc === 'US' || cc === 'USA') ? 'United States' : '';
+      if (full) {
+        countrySel.value = full;
+        for (var i = 0; i < countrySel.options.length; i++) {
+          countrySel.options[i].disabled = (countrySel.options[i].value !== full);
+        }
+        countrySel.classList.add('pay-later-input--readonly');
+      }
+    }
+
+    // Shipping company: fill + lock when the location has one.
+    var companyField = document.getElementById('pay-later-company');
+    if (companyField && loc.company) {
+      companyField.value = loc.company;
+      companyField.setAttribute('readonly', '');
+      companyField.classList.add('pay-later-input--readonly');
+      var companyWrapper = document.getElementById('pay-later-shipping-company-wrapper');
+      if (companyWrapper) companyWrapper.style.display = 'block';
+    }
+  }
+
   // Load global settings on page load for limited and Manager+Extended customers
   if (isLimitedCustomer || isManagerExtended) {
     loadGlobalSettings();
   }
+
+  // Resolve any pinned location collection and apply its card-payment rule
+  initPinnedLocation();
 
   if (payLaterBtn) {
     payLaterBtn.addEventListener('click', function() {
@@ -1786,6 +1893,8 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       // Auto-populate billing address for limited and Manager+Extended customers
       populateLimitedCustomerBillingAddress();
+      // Auto-populate + lock shipping to the pinned location collection (Target Hospitality)
+      populatePinnedLocationShipping();
     });
   }
 
