@@ -69,6 +69,8 @@
   {%- assign customer_company_slug = 'blue-life-security' -%}
 {%- elsif has_akima_tag -%}
   {%- assign customer_company_slug = 'akima' -%}
+{%- elsif has_target_tag -%}
+  {%- assign customer_company_slug = 'target-hospitality' -%}
 {%- else -%}
   {%- for tag in customer.tags -%}
     {%- assign tag_lower = tag | downcase | strip -%}
@@ -83,6 +85,18 @@
 {%- assign apply_add_to_cart_limits = false -%}
 {%- if is_limited_customer and is_bulk_order_customer == false and is_akima_company_customer == false -%}
   {%- assign apply_add_to_cart_limits = true -%}
+{%- endif -%}
+
+{%- comment -%}
+  Card / express payment is normally hidden for Limit, Akima, and Manager+Extended customers.
+  For Target Hospitality customers, the pinned location's Card Payment toggle is the sole
+  authority instead: when those customers would be suppressed, the card is rendered hidden
+  (.th-card-gated) and JS reveals it if the location allows card, or hides it if not. This
+  lets a TH manager (Extended+Manager+TH) still pay by card at a card-enabled location.
+{%- endcomment -%}
+{%- assign card_default_shown = true -%}
+{%- if is_limited_customer or has_akima_tag or is_manager_extended -%}
+  {%- assign card_default_shown = false -%}
 {%- endif -%}
 
 <section>
@@ -858,16 +872,16 @@
                       </div>
 
                     {%- when 'express_checkout_buttons' -%}
-                      {%- comment -%}Hide express checkout for limited, Akima, and Manager+Extended customers - they can only use Pay Later{%- endcomment -%}
-                      {%- unless is_limited_customer or has_akima_tag or is_manager_extended -%}
+                      {%- comment -%}Hidden for limited/Akima/Manager+Extended; for TH customers it renders hidden and JS reveals it when the location allows card.{%- endcomment -%}
+                      {%- if card_default_shown or has_target_tag -%}
                         {%- if additional_checkout_buttons -%}
-                          <div class="cart__recap-block" {{ block.shopify_attributes }}>
+                          <div class="cart__recap-block{% unless card_default_shown %} th-card-gated{% endunless %}"{% unless card_default_shown %} style="display: none;"{% endunless %} {{ block.shopify_attributes }}>
                             <div class="additional-checkout-buttons additional-checkout-buttons--vertical">
                               {{- content_for_additional_checkout_buttons -}}
                             </div>
                           </div>
                         {%- endif -%}
-                      {%- endunless -%}
+                      {%- endif -%}
 
                     {%- when '@app' -%}
                       <div class="cart__recap-block">
@@ -876,12 +890,12 @@
                   {%- endcase -%}
                 {%- endfor -%}
 
-                {%- unless is_limited_customer or has_akima_tag or is_manager_extended -%}
-                <button type="submit" class="cart__checkout-button checkout-button button button--primary button--full" name="checkout">
+                {%- if card_default_shown or has_target_tag -%}
+                <button type="submit" class="cart__checkout-button checkout-button button button--primary button--full{% unless card_default_shown %} th-card-gated{% endunless %}"{% unless card_default_shown %} style="display: none;"{% endunless %} name="checkout">
                   <span class="checkout-button__lock">{%- render 'icon' with 'lock' -%}</span>
                   Pay Now
                 </button>
-                {%- endunless -%}
+                {%- endif -%}
 
                 {%- comment -%}Pay Later Button - Shows as "Place Order" for Limit customers, primary for Manager+Extended{%- endcomment -%}
                 <button type="button" id="pay-later-btn" class="cart__pay-later-button button button--full{% if is_limited_customer or has_akima_tag or is_manager_extended %} cart__pay-later-button--primary{% endif %}">
@@ -907,10 +921,10 @@
                 </style>
               </form>
 
-              {%- comment -%}Hide "We accept" payment methods for limited, Akima, and Manager+Extended customers{%- endcomment -%}
-              {%- unless is_limited_customer or has_akima_tag or is_manager_extended -%}
+              {%- comment -%}Hidden for limited/Akima/Manager+Extended; for TH customers it renders hidden and JS reveals it when the location allows card.{%- endcomment -%}
+              {%- if card_default_shown or has_target_tag -%}
                 {%- if section.settings.show_payment_methods and shop.enabled_payment_types.size > 0 -%}
-                  <div class="cart__payment-methods">
+                  <div class="cart__payment-methods{% unless card_default_shown %} th-card-gated{% endunless %}"{% unless card_default_shown %} style="display: none;"{% endunless %}>
                     <span class="cart__payment-methods-label text--xsmall text--subdued">{{ 'cart.general.we_accept' | t }}</span>
 
                     <div class="payment-methods-list payment-methods-list--center">
@@ -920,7 +934,7 @@
                     </div>
                   </div>
                 {%- endif -%}
-              {%- endunless -%}
+              {%- endif -%}
             </safe-sticky>
           </div>
         </div>
@@ -1621,6 +1635,8 @@ document.addEventListener('DOMContentLoaded', function() {
   var isBulkOrderCustomer = {{ is_bulk_order_customer | json }};
   var isAkimaCompanyCustomer = {{ is_akima_company_customer | json }};
   var isManagerExtended = {{ is_manager_extended | json }};
+  // Target Hospitality customer: billing comes from the TH global settings, shipping from the location.
+  var isTargetCustomer = {{ has_target_tag | json }} === true;
 
   // Location pinned to the cart from the collection the customer ordered in (Target Hospitality).
   // Drives credit-card availability and Pay Later shipping for this cart.
@@ -1709,9 +1725,9 @@ document.addEventListener('DOMContentLoaded', function() {
     deliveryMethodPickup.addEventListener('click', function() { setDeliveryMethod('pickup'); });
   }
 
-  // Function to load global settings for limited and Manager+Extended customers
+  // Function to load global settings for limited, Manager+Extended, and Target Hospitality customers
   async function loadGlobalSettings() {
-    if (!isLimitedCustomer && !isManagerExtended) return;
+    if (!isLimitedCustomer && !isManagerExtended && !isTargetCustomer) return;
 
     try {
       var url = 'https://image-first-portal.netlify.app/.netlify/functions/get-global-settings';
@@ -1738,7 +1754,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Function to auto-populate billing address for limited and Manager+Extended customers
   function populateLimitedCustomerBillingAddress() {
-    if ((!isLimitedCustomer && !isManagerExtended) || !globalSettings) return;
+    if ((!isLimitedCustomer && !isManagerExtended && !isTargetCustomer) || !globalSettings) return;
 
     var fields = {
       'pay-later-billing-first-name': globalSettings.billingFirstName,
@@ -1821,7 +1837,14 @@ document.addEventListener('DOMContentLoaded', function() {
   // Card Payment toggle OFF for this location -> hide card / express / payment icons
   // so only Pay Later remains. Toggle ON (or unset-but-true) leaves the default UI.
   function applyPinnedLocationCard() {
-    if (!pinnedLocation || pinnedLocation.cardPayment === true) return;
+    if (!pinnedLocation) return;
+    if (pinnedLocation.cardPayment === true) {
+      // Card allowed for this location -> reveal any card elements that were rendered
+      // hidden for TH customers whose tags would otherwise suppress card payment.
+      document.querySelectorAll('.th-card-gated').forEach(function (el) { el.style.display = ''; });
+      return;
+    }
+    // Card not allowed for this location -> hide card / express / payment icons (Pay Later only).
     document.querySelectorAll('.cart__checkout-button').forEach(function (el) { el.style.display = 'none'; });
     document.querySelectorAll('.additional-checkout-buttons').forEach(function (el) {
       var block = el.closest('.cart__recap-block');
@@ -1880,8 +1903,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  // Load global settings on page load for limited and Manager+Extended customers
-  if (isLimitedCustomer || isManagerExtended) {
+  // Load global settings on page load for limited, Manager+Extended, and Target Hospitality customers
+  if (isLimitedCustomer || isManagerExtended || isTargetCustomer) {
     loadGlobalSettings();
   }
 
@@ -1892,8 +1915,8 @@ document.addEventListener('DOMContentLoaded', function() {
     payLaterBtn.addEventListener('click', function() {
       payLaterModal.classList.add('active');
       loadCartData();
-      // Auto-populate shipping email for limited and Manager+Extended customers
-      if (isLimitedCustomer || isManagerExtended) {
+      // Auto-populate shipping email for limited, Manager+Extended, and Target Hospitality customers
+      if (isLimitedCustomer || isManagerExtended || isTargetCustomer) {
         var shippingEmailField = document.getElementById('pay-later-email');
         if (shippingEmailField) {
           shippingEmailField.value = {{ customer.email | json }};
