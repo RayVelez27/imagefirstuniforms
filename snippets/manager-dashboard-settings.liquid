@@ -812,6 +812,11 @@
       cb.type = 'checkbox';
       cb.className = 'location-card-payment';
       cb.checked = !!loc.cardPayment;
+      // Capture the toggle into state the moment it changes, so a re-render (e.g. the
+      // async settings load) can't reset it back to the default before the row is saved.
+      cb.addEventListener('change', function () {
+        if (locationsState[i]) locationsState[i].cardPayment = cb.checked;
+      });
       const slider = document.createElement('span');
       slider.className = 'card-toggle__slider';
       const tlabel = document.createElement('span');
