@@ -85,9 +85,12 @@
       return;
     }
 
-    // First add from a location context on an unpinned cart: lock the silo (optimistic +
-    // persisted) so a rapid follow-up add from a different location is caught.
-    if (!cart.location && currentLocationHandle) {
+    // Establish the cart's location. Re-pin whenever the cart is empty (so a stale
+    // location left over from a previous or checked-out order can't carry into a new
+    // order for a different location) or when nothing is pinned yet. This only ever
+    // SETS the pin to the current location -- it never clears it -- so location
+    // resolution (shipping + card gating) can't break.
+    if (currentLocationHandle && (cart.item_count === 0 || !cart.location)) {
       cart.location = currentLocationHandle;
       cart.locationName = currentLocationTitle;
       setCartLocation(currentLocationHandle, currentLocationTitle);
