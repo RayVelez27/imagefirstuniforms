@@ -33,8 +33,23 @@
   {%- endif -%}
 <script>
 (function () {
-  var currentLocationHandle = {{ _loc_handle | json }};
-  var currentLocationTitle = {{ _loc_title | json }};
+  // The location the customer is ordering from. On a location collection page this is
+  // the collection; we remember it in sessionStorage so a later add from the product
+  // page still knows the location -- product links are the bare /products/<handle> URL
+  // with no collection context, so the product page can't supply it on its own.
+  var pageLocationHandle = {{ _loc_handle | json }};
+  var pageLocationTitle = {{ _loc_title | json }};
+  var currentLocationHandle = pageLocationHandle;
+  var currentLocationTitle = pageLocationTitle;
+  try {
+    if (pageLocationHandle) {
+      sessionStorage.setItem('thLocationHandle', pageLocationHandle);
+      sessionStorage.setItem('thLocationTitle', pageLocationTitle || '');
+    } else {
+      currentLocationHandle = sessionStorage.getItem('thLocationHandle') || '';
+      currentLocationTitle = sessionStorage.getItem('thLocationTitle') || '';
+    }
+  } catch (e) {}
 
   // Cached cart snapshot so the silo decision in the submit handler is synchronous.
   var cart = { item_count: 0, location: '', locationName: '' };
