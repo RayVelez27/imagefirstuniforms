@@ -56,11 +56,6 @@
     cart.item_count = c.item_count || 0;
     cart.location = (c.attributes && c.attributes['Location']) || '';
     cart.locationName = (c.attributes && c.attributes['Location Name']) || '';
-    // Empty cart -> drop any stale pinned location so a prior order's saved shipping
-    // can't surface for a later order at a different location.
-    if (cart.item_count === 0 && cart.location) {
-      clearCartLocation();
-    }
   }
 
   function refreshCart() {
@@ -72,16 +67,6 @@
     var fd = new FormData();
     fd.append('attributes[Location]', handle);
     fd.append('attributes[Location Name]', title || '');
-    fetch('/cart/update.js', { method: 'POST', body: fd }).catch(function () {});
-  }
-
-  // Clear the pinned location (used when the cart becomes empty).
-  function clearCartLocation() {
-    cart.location = '';
-    cart.locationName = '';
-    var fd = new FormData();
-    fd.append('attributes[Location]', '');
-    fd.append('attributes[Location Name]', '');
     fetch('/cart/update.js', { method: 'POST', body: fd }).catch(function () {});
   }
 
@@ -100,10 +85,9 @@
       return;
     }
 
-    // Establish the cart's location. Re-pin whenever the cart is empty (so a stale
-    // location left over from a previous or checked-out order can't carry into a new
-    // order for a different location) or when nothing is pinned yet.
-    if (currentLocationHandle && (cart.item_count === 0 || !cart.location)) {
+    // First add from a location context on an unpinned cart: lock the silo (optimistic +
+    // persisted) so a rapid follow-up add from a different location is caught.
+    if (!cart.location && currentLocationHandle) {
       cart.location = currentLocationHandle;
       cart.locationName = currentLocationTitle;
       setCartLocation(currentLocationHandle, currentLocationTitle);
