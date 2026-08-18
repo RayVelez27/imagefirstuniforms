@@ -1842,6 +1842,10 @@ document.addEventListener('DOMContentLoaded', function() {
       // Card allowed for this location -> reveal any card elements that were rendered
       // hidden for TH customers whose tags would otherwise suppress card payment.
       document.querySelectorAll('.th-card-gated').forEach(function (el) { el.style.display = ''; });
+      // Pay Later is styled --primary (margin-top:0) on the assumption it's the only
+      // button. Now that Pay Now is shown above it, restore the gap between them.
+      var payLaterBtnEl = document.querySelector('.cart__pay-later-button');
+      if (payLaterBtnEl) payLaterBtnEl.style.marginTop = '1rem';
       return;
     }
     // Card not allowed for this location -> hide card / express / payment icons (Pay Later only).
