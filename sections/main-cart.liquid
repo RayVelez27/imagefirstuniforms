@@ -1966,12 +1966,21 @@ document.addEventListener('DOMContentLoaded', function() {
       'pay-later-phone': 'pay-later-billing-phone'
     };
 
+    // Shipping country uses full names ("United States"/"Canada"); billing country
+    // uses ISO codes ("US"/"CA"). Translate when copying so the billing <select>
+    // lands on a real option instead of silently falling back to empty.
+    var shippingToBillingCountry = { 'United States': 'US', 'Canada': 'CA' };
+
     function copyShippingToBilling() {
       for (var shipId in shippingToBillingMap) {
         var shipEl = document.getElementById(shipId);
         var billEl = document.getElementById(shippingToBillingMap[shipId]);
         if (shipEl && billEl) {
-          billEl.value = shipEl.value;
+          if (billEl.id === 'pay-later-billing-country') {
+            billEl.value = shippingToBillingCountry[shipEl.value] || '';
+          } else {
+            billEl.value = shipEl.value;
+          }
         }
       }
     }
@@ -1979,9 +1988,21 @@ document.addEventListener('DOMContentLoaded', function() {
     sameAsShippingCheckbox.addEventListener('change', function() {
       if (this.checked) {
         copyShippingToBilling();
-        if (billingFieldsContainer) billingFieldsContainer.style.display = 'none';
+        if (billingFieldsContainer) {
+          // A required field that is display:none can't be focused, so native
+          // constraint validation aborts the submit with a "not focusable" error
+          // and our submit handler never runs. Drop required while the billing
+          // fields are hidden, and restore it when they come back into view.
+          var hiddenRequired = billingFieldsContainer.querySelectorAll('[required]');
+          hiddenRequired.forEach(function(f) { f.setAttribute('data-was-required', 'true'); f.removeAttribute('required'); });
+          billingFieldsContainer.style.display = 'none';
+        }
       } else {
-        if (billingFieldsContainer) billingFieldsContainer.style.display = '';
+        if (billingFieldsContainer) {
+          billingFieldsContainer.style.display = '';
+          var restoreRequired = billingFieldsContainer.querySelectorAll('[data-was-required]');
+          restoreRequired.forEach(function(f) { f.setAttribute('required', ''); f.removeAttribute('data-was-required'); });
+        }
       }
     });
   }
