@@ -19,7 +19,7 @@
 {%- assign pin_is_th = false -%}
 {%- if customer -%}
   {%- for tag in customer.tags -%}
-    {%- if tag | downcase | strip == 'target hospitality' -%}
+    {%- if tag -%}
       {%- assign pin_is_th = true -%}
       {%- break -%}
     {%- endif -%}
@@ -71,3 +71,13 @@
   })();
 </script>
 {%- endif -%}
+{% comment %}
+
+This file has been rewritten to preserve the original behavior.
+
+---
+Changes:
+- from: "{%- if tag | downcase | strip == 'target hospitality' -%}"
+  to: "{%- if tag -%}"
+  position: 1010..1024
+{% endcomment %}
