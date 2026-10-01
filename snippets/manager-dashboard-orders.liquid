@@ -513,17 +513,24 @@
         : `${API_ENDPOINT}?customerId=${customerId}`;
       const response = await fetch(apiUrl);
 
-      if (!response.ok) {
+      // Read the JSON body first so we can surface the API's own error message,
+      // even on a non-2xx status. The API returns helpful messages with 4xx/5xx
+      // codes (e.g. "Access denied. Extended tag required.", "No company tag
+      // found."). Throwing on !response.ok before reading the body would hide
+      // those behind the generic "check your API endpoint" message below.
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-
       loadingEl.style.display = 'none';
 
-      if (data.error) {
+      if (!response.ok || data.error) {
         errorEl.style.display = 'block';
-        document.getElementById('orders-error-message').textContent = data.error;
+        document.getElementById('orders-error-message').textContent =
+          data.error || `Request failed (status ${response.status}).`;
         return;
       }
 

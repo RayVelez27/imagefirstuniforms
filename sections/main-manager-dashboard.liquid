@@ -3,7 +3,26 @@
   Only accessible to customers with "Manager" tag
 {%- endcomment -%}
 
-{% if customer and customer.tags contains 'Manager' %}
+{%- comment -%}
+  Detect Manager / Extended / Akima tags.
+  Uses an exact, case-insensitive token match so this mirrors the API exactly
+  (the API checks tag.toLowerCase() === 'manager' / 'extended'). A substring
+  match here would send extended=true for tags like "super-extended" and the
+  API would then reject the request with a 403.
+{%- endcomment -%}
+{%- assign has_manager_tag = false -%}
+{%- assign has_extended_tag = false -%}
+{%- assign has_akima_tag = false -%}
+{%- if customer -%}
+  {%- for _tag in customer.tags -%}
+    {%- assign _tag_normalized = _tag | downcase | strip -%}
+    {%- if _tag_normalized == 'manager' -%}{%- assign has_manager_tag = true -%}{%- endif -%}
+    {%- if _tag_normalized == 'extended' -%}{%- assign has_extended_tag = true -%}{%- endif -%}
+    {%- if _tag_normalized == 'akima' -%}{%- assign has_akima_tag = true -%}{%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+
+{% if has_manager_tag %}
   <section class="manager-dashboard">
     <div class="container">
       <div class="page-header">
@@ -17,17 +36,6 @@
           {%- endif -%}
         </div>
       </div>
-
-      {%- comment -%} Check if manager has Extended and/or Akima tags (case-insensitive) {%- endcomment -%}
-      {%- assign has_extended_tag = false -%}
-      {%- assign has_akima_tag = false -%}
-      {%- assign customer_tags_lower = customer.tags | join: ',' | downcase -%}
-      {%- if customer_tags_lower contains 'extended' -%}
-        {%- assign has_extended_tag = true -%}
-      {%- endif -%}
-      {%- if customer_tags_lower contains 'akima' -%}
-        {%- assign has_akima_tag = true -%}
-      {%- endif -%}
 
       {%- comment -%} Dashboard Tabs Navigation {%- endcomment -%}
       {%- render 'manager-dashboard-tabs', is_extended_manager: has_extended_tag -%}
