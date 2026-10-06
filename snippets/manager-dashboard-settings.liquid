@@ -131,12 +131,48 @@
         </div>
       </div>
 
+      <div class="settings-toggle-row">
+        <label class="card-toggle">
+          <input type="checkbox" id="lock-billing-address" checked>
+          <span class="card-toggle__slider"></span>
+          <span class="card-toggle__label">Lock billing address</span>
+        </label>
+        <p class="settings-section-description" style="margin: 8px 0 0;">When on, your company&rsquo;s users cannot edit the billing address at checkout.</p>
+      </div>
+
       <div class="section-actions">
         <button type="button" id="save-billing-btn" class="button button--primary">Save Billing Address</button>
         <span id="billing-success" class="section-success" style="display: none;">Saved!</span>
         <span id="billing-error" class="section-error" style="display: none;"></span>
       </div>
     </div>
+
+    {%- comment -%}
+      Checkout Options: company-wide credit-card / pay-now toggle. Hidden for
+      Target managers, who control card payment per location in the Locations
+      section below (per-location setting takes precedence at the cart).
+    {%- endcomment -%}
+    {%- unless is_target_manager -%}
+    <div class="settings-section">
+      <h3 class="settings-section-title">Checkout Options</h3>
+      <p class="settings-section-description">Control how your company&rsquo;s users can pay at checkout.</p>
+
+      <div class="settings-toggle-row">
+        <label class="card-toggle">
+          <input type="checkbox" id="card-payment-enabled" checked>
+          <span class="card-toggle__slider"></span>
+          <span class="card-toggle__label">Allow credit card / pay-now checkout</span>
+        </label>
+        <p class="settings-section-description" style="margin: 8px 0 0;">When off, your company&rsquo;s users can only place orders with Pay Later.</p>
+      </div>
+
+      <div class="section-actions">
+        <button type="button" id="save-checkout-options-btn" class="button button--primary">Save Checkout Options</button>
+        <span id="checkout-options-success" class="section-success" style="display: none;">Saved!</span>
+        <span id="checkout-options-error" class="section-error" style="display: none;"></span>
+      </div>
+    </div>
+    {%- endunless -%}
 
     {%- if show_target_locations -%}
     <div class="settings-section" id="locations-settings-section">
@@ -319,6 +355,12 @@
   .section-error {
     color: #d32f2f;
     font-size: 14px;
+  }
+
+  .settings-toggle-row {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #f0f0f0;
   }
 
   /* Locations section */
@@ -550,6 +592,8 @@
     if (notificationsBtn) notificationsBtn.addEventListener('click', handleSaveNotifications);
     var poBtn = document.getElementById('save-po-btn');
     if (poBtn) poBtn.addEventListener('click', handleSavePO);
+    var checkoutOptionsBtn = document.getElementById('save-checkout-options-btn');
+    if (checkoutOptionsBtn) checkoutOptionsBtn.addEventListener('click', handleSaveCheckoutOptions);
 
     // Locations section (Extended + Manager + Target managers only)
     initTargetLocations();
@@ -600,6 +644,18 @@
         field.value = value;
       }
     }
+
+    // Policy toggles. Both default to on (true) when the stored value is absent,
+    // matching the consumer defaults in the cart, so the checkbox only reflects
+    // an explicit saved choice.
+    const lockBillingEl = document.getElementById('lock-billing-address');
+    if (lockBillingEl && typeof settings.lockBillingAddress === 'boolean') {
+      lockBillingEl.checked = settings.lockBillingAddress;
+    }
+    const cardPaymentEl = document.getElementById('card-payment-enabled');
+    if (cardPaymentEl && typeof settings.cardPaymentEnabled === 'boolean') {
+      cardPaymentEl.checked = settings.cardPaymentEnabled;
+    }
   }
 
   async function saveSection(sectionData, btnId, successId, errorId, btnText) {
@@ -647,6 +703,7 @@
   function handleSaveBilling() {
     const companyNameField = document.getElementById('billing-company-name');
     const emailField = document.getElementById('billing-email');
+    const lockBillingEl = document.getElementById('lock-billing-address');
 
     const data = {
       billingFirstName: document.getElementById('billing-first-name').value,
@@ -659,9 +716,18 @@
       billingZip: document.getElementById('billing-zip').value,
       billingCountry: document.getElementById('billing-country').value,
       billingEmail: emailField ? emailField.value : '',
-      billingPhone: document.getElementById('billing-phone').value
+      billingPhone: document.getElementById('billing-phone').value,
+      lockBillingAddress: lockBillingEl ? lockBillingEl.checked : true
     };
     saveSection(data, 'save-billing-btn', 'billing-success', 'billing-error', 'Save Billing Address');
+  }
+
+  function handleSaveCheckoutOptions() {
+    const cardEl = document.getElementById('card-payment-enabled');
+    const data = {
+      cardPaymentEnabled: cardEl ? cardEl.checked : true
+    };
+    saveSection(data, 'save-checkout-options-btn', 'checkout-options-success', 'checkout-options-error', 'Save Checkout Options');
   }
 
   function handleSaveNotifications() {

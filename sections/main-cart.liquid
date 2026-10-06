@@ -1746,6 +1746,14 @@ document.addEventListener('DOMContentLoaded', function() {
             window.updateCartAttribute('attributes[PO Number]', globalSettings.globalPO);
           }
         }
+
+        // Company-wide "Allow credit card / pay-now checkout" toggle. Treated as
+        // allowed unless explicitly set to false. A pinned Target location
+        // controls card payment per location (initPinnedLocation), so the global
+        // toggle only applies when there is no pinned location.
+        if (!pinnedLocationHandle && globalSettings.cardPaymentEnabled === false) {
+          hideCardPaymentUI();
+        }
       }
     } catch (error) {
       console.error('Error loading global settings:', error);
@@ -1794,6 +1802,55 @@ document.addEventListener('DOMContentLoaded', function() {
     var hiddenCountry = document.getElementById('pay-later-billing-country-hidden');
     if (hiddenCountry && globalSettings.billingCountry) {
       hiddenCountry.value = globalSettings.billingCountry;
+    }
+
+    // Company-wide "Lock billing address" toggle. Billing fields are locked
+    // (readonly) by default in the markup for these customers; this is the only
+    // path that unlocks them, so the default (toggle on / absent) keeps today's
+    // locked behavior unchanged.
+    if (globalSettings.lockBillingAddress === false) {
+      unlockBillingAddressFields();
+    }
+  }
+
+  // Remove the readonly/disabled locks from the Pay Later billing fields so the
+  // user can edit them. Only runs when a manager has turned "Lock billing
+  // address" off for the company.
+  function unlockBillingAddressFields() {
+    var ids = [
+      'pay-later-billing-first-name',
+      'pay-later-billing-last-name',
+      'pay-later-billing-company',
+      'pay-later-billing-address',
+      'pay-later-billing-address2',
+      'pay-later-billing-city',
+      'pay-later-billing-province',
+      'pay-later-billing-zip',
+      'pay-later-billing-phone'
+    ];
+    ids.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.removeAttribute('readonly');
+      el.classList.remove('pay-later-input--readonly');
+    });
+
+    // Country: the markup renders a disabled <select> (no name attribute) plus a
+    // hidden input carrying billing_country. Enable the select, give it the form
+    // name, and neutralize the hidden input so the value isn't submitted twice.
+    var countrySel = document.getElementById('pay-later-billing-country');
+    var hiddenCountry = document.getElementById('pay-later-billing-country-hidden');
+    if (countrySel) {
+      countrySel.removeAttribute('disabled');
+      countrySel.classList.remove('pay-later-input--readonly');
+      countrySel.setAttribute('name', 'billing_country');
+      if (hiddenCountry && hiddenCountry.value && !countrySel.value) {
+        countrySel.value = hiddenCountry.value;
+      }
+    }
+    if (hiddenCountry) {
+      hiddenCountry.removeAttribute('name');
+      hiddenCountry.disabled = true;
     }
   }
 
@@ -1849,6 +1906,13 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
     // Card not allowed for this location -> hide card / express / payment icons (Pay Later only).
+    hideCardPaymentUI();
+  }
+
+  // Hide credit-card / express / pay-now checkout so only Pay Later remains.
+  // Shared by the per-location Target rule above and the company-wide
+  // "Allow credit card / pay-now checkout" setting (applied in loadGlobalSettings).
+  function hideCardPaymentUI() {
     document.querySelectorAll('.cart__checkout-button').forEach(function (el) { el.style.display = 'none'; });
     document.querySelectorAll('.additional-checkout-buttons').forEach(function (el) {
       var block = el.closest('.cart__recap-block');
