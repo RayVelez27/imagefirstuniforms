@@ -161,7 +161,7 @@
       </div>
     </div>
 
-    <table class="dashboard-table">
+    <table class="dashboard-table" id="users-table">
       <thead>
         <tr>
           <th>Name</th>
@@ -178,6 +178,8 @@
         {%- comment -%} Users will be populated via JavaScript {%- endcomment -%}
       </tbody>
     </table>
+
+    <nav id="users-pagination" class="dashboard-pagination" aria-label="Users pages" hidden></nav>
   </div>
 
   {%- comment -%} Empty state {%- endcomment -%}
@@ -195,8 +197,13 @@
   const IS_EXTENDED_MANAGER = {{ is_extended_manager | json }};
   const IS_AKIMA_MANAGER = {{ is_akima_manager | default: false | json }};
 
-  let usersData = [];
+  const USERS_PAGE_SIZE = 50;
+
+  let usersData = [];           // All users (client-side fallback) or the current page (paginated API)
   let filteredUsersData = [];
+  let usersPage = 1;
+  let usersServerPaging = null; // Set by the first response: true when the API paginates
+  let usersRequestId = 0;
   let akimaPrograms = [];
 
   // Only load users when the Users tab is clicked
@@ -276,10 +283,27 @@
     };
   }
 
+  function getUserFilters() {
+    return {
+      search: document.getElementById('users-search').value.toLowerCase().trim(),
+      status: document.getElementById('users-filter-status').value,
+      orders: document.getElementById('users-filter-orders').value
+    };
+  }
+
   function applyUserFilters() {
-    const searchTerm = document.getElementById('users-search').value.toLowerCase().trim();
-    const statusFilter = document.getElementById('users-filter-status').value;
-    const ordersFilter = document.getElementById('users-filter-orders').value;
+    // Paginated API filters server-side, so fetch the first matching page
+    if (usersServerPaging) {
+      loadUsers(1);
+      return;
+    }
+
+    filterUsersLocally();
+    showClientUsersPage(1);
+  }
+
+  function filterUsersLocally() {
+    const { search: searchTerm, status: statusFilter, orders: ordersFilter } = getUserFilters();
 
     filteredUsersData = usersData.filter(user => {
       // Search filter
@@ -296,8 +320,8 @@
 
       // Status filter
       if (statusFilter) {
-        // Consider users with orders as "enabled" per previous logic
-        const effectiveStatus = (user.state === 'enabled' || user.ordersCount > 0) ? 'enabled' : user.state;
+        // Match the status badge the user sees (users with orders count as "enabled")
+        const effectiveStatus = getStatusLabel(user).toLowerCase();
         if (effectiveStatus !== statusFilter) {
           return false;
         }
@@ -314,20 +338,56 @@
 
       return true;
     });
-
-    renderUsersTable(filteredUsersData);
-    updateUserFilterCount();
   }
 
-  function updateUserFilterCount() {
-    const countEl = document.getElementById('users-filter-count');
-    const total = usersData.length;
-    const filtered = filteredUsersData.length;
-
-    if (filtered === total) {
-      countEl.textContent = `Showing all ${total} users`;
+  function goToUsersPage(page) {
+    if (usersServerPaging) {
+      loadUsers(page);
     } else {
-      countEl.textContent = `Showing ${filtered} of ${total} users`;
+      showClientUsersPage(page);
+    }
+    document.getElementById('users-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // Fallback when the API returns every user: slice the filtered list in the browser
+  function showClientUsersPage(page) {
+    const totalCount = filteredUsersData.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / USERS_PAGE_SIZE));
+    const currentPage = Math.min(Math.max(1, page), totalPages);
+    const start = (currentPage - 1) * USERS_PAGE_SIZE;
+
+    renderUsersPage(
+      filteredUsersData.slice(start, start + USERS_PAGE_SIZE),
+      { page: currentPage, pageSize: USERS_PAGE_SIZE, totalPages, totalCount },
+      usersData.length
+    );
+  }
+
+  function renderUsersPage(users, pagination, overallCount) {
+    usersPage = pagination.page;
+
+    renderUsersTable(users);
+    updateUserFilterCount(pagination, overallCount);
+    renderDashboardPagination(document.getElementById('users-pagination'), pagination.page, pagination.totalPages, goToUsersPage);
+  }
+
+  function updateUserFilterCount(pagination, overallCount) {
+    const countEl = document.getElementById('users-filter-count');
+    const { page, pageSize, totalCount } = pagination;
+
+    if (totalCount === 0) {
+      countEl.textContent = `Showing 0 of ${overallCount} users`;
+      return;
+    }
+
+    const first = (page - 1) * pageSize + 1;
+    const last = Math.min(page * pageSize, totalCount);
+    const range = (first === 1 && last === totalCount) ? `all ${totalCount}` : `${first}–${last} of ${totalCount}`;
+
+    if (totalCount === overallCount) {
+      countEl.textContent = `Showing ${range} users`;
+    } else {
+      countEl.textContent = `Showing ${range} matching users (${overallCount} total)`;
     }
   }
 
@@ -490,7 +550,7 @@
       setTimeout(() => {
         document.getElementById('add-user-modal').style.display = 'none';
         successEl.style.display = 'none';
-        loadUsers(); // Reload the users table
+        loadUsers(usersPage); // Reload the users table
       }, 2000);
 
     } catch (error) {
@@ -570,31 +630,46 @@
     addActionButtonHandlers();
   }
 
-  async function loadUsers() {
+  async function loadUsers(page = 1) {
     const customerId = {{ customer.id | json }};
     const loadingEl = document.getElementById('users-loading');
     const errorEl = document.getElementById('users-error');
     const containerEl = document.getElementById('users-container');
     const emptyEl = document.getElementById('users-empty');
+    const tableEl = document.getElementById('users-table');
+    const requestId = ++usersRequestId;
+    const isFirstLoad = usersServerPaging === null;
 
     try {
-      // Show loading state
-      loadingEl.style.display = 'block';
       errorEl.style.display = 'none';
-      containerEl.style.display = 'none';
-      emptyEl.style.display = 'none';
+      if (isFirstLoad) {
+        // Show loading state
+        loadingEl.style.display = 'block';
+        containerEl.style.display = 'none';
+        emptyEl.style.display = 'none';
+      } else {
+        // Keep the current page (and the filter inputs) visible while the next one loads
+        tableEl.classList.add('is-loading');
+      }
 
-      // Make API call - Extended managers get all Limit users
-      const apiUrl = IS_EXTENDED_MANAGER
-        ? `${USERS_API_ENDPOINT}?customerId=${customerId}&extended=true`
-        : `${USERS_API_ENDPOINT}?customerId=${customerId}`;
-      const response = await fetch(apiUrl);
+      // Make API call - Extended managers get all users for their company tag
+      const filters = getUserFilters();
+      const params = new URLSearchParams({ customerId, page, pageSize: USERS_PAGE_SIZE });
+      if (IS_EXTENDED_MANAGER) params.set('extended', 'true');
+      if (filters.search) params.set('search', filters.search);
+      if (filters.status) params.set('status', filters.status);
+      if (filters.orders) params.set('orders', filters.orders);
+
+      const response = await fetch(`${USERS_API_ENDPOINT}?${params}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
+
+      // A newer page or filter request was made while this one was in flight
+      if (requestId !== usersRequestId) return;
 
       // Hide loading
       loadingEl.style.display = 'none';
@@ -606,8 +681,9 @@
         return;
       }
 
-      // Check if empty
-      if (!data.users || data.users.length === 0) {
+      // Check if empty (userCount is the unfiltered total)
+      if (!data.users || !data.userCount) {
+        containerEl.style.display = 'none';
         emptyEl.style.display = 'block';
         return;
       }
@@ -620,20 +696,30 @@
       document.getElementById('total-users').textContent = data.userCount || 0;
 
       usersData = data.users;
-      filteredUsersData = data.users;
 
-      renderUsersTable(filteredUsersData);
-      updateUserFilterCount();
+      if (data.pagination) {
+        usersServerPaging = true;
+        filteredUsersData = data.users;
+        renderUsersPage(data.users, data.pagination, data.userCount);
+      } else {
+        // API without pagination support returned every user: page through them here
+        usersServerPaging = false;
+        filterUsersLocally();
+        showClientUsersPage(page);
+      }
 
       // Show table
       containerEl.style.display = 'block';
 
     } catch (error) {
+      if (requestId !== usersRequestId) return;
       console.error('Error loading users:', error);
       loadingEl.style.display = 'none';
       errorEl.style.display = 'block';
       document.getElementById('users-error-message').textContent =
         'Failed to load users. Please check that your API endpoint is configured correctly.';
+    } finally {
+      if (requestId === usersRequestId) tableEl.classList.remove('is-loading');
     }
   }
 
@@ -962,7 +1048,7 @@
       setTimeout(() => {
         modal.style.display = 'none';
         successEl.style.display = 'none';
-        loadUsers();
+        loadUsers(usersPage);
       }, 1500);
 
     } catch (error) {

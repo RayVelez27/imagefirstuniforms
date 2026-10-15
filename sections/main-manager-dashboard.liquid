@@ -29,6 +29,9 @@
         {%- assign has_akima_tag = true -%}
       {%- endif -%}
 
+      {%- comment -%} Shared pager used by the Orders and Users tabs {%- endcomment -%}
+      {%- render 'manager-dashboard-pagination' -%}
+
       {%- comment -%} Dashboard Tabs Navigation {%- endcomment -%}
       {%- render 'manager-dashboard-tabs', is_extended_manager: has_extended_tag -%}
 
