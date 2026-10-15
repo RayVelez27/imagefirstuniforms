@@ -57,7 +57,7 @@
       </div>
     </div>
 
-    <table class="dashboard-table">
+    <table class="dashboard-table" id="orders-table">
       <thead>
         <tr>
           <th>Order #</th>
@@ -73,6 +73,8 @@
         {%- comment -%} Orders will be populated via JavaScript {%- endcomment -%}
       </tbody>
     </table>
+
+    <nav id="orders-pagination" class="dashboard-pagination" aria-label="Orders pages" hidden></nav>
   </div>
 
   {%- comment -%} Empty state {%- endcomment -%}
@@ -173,8 +175,14 @@
 <script>
   const API_ENDPOINT = 'https://image-first-portal.netlify.app/.netlify/functions/manager-orders';
 
-  let ordersData = [];
+  const ORDERS_PAGE_SIZE = 50;
+
+  let ordersData = [];          // Client-side fallback only: every order the API returned
   let filteredOrdersData = [];
+  let pageOrders = [];          // Orders on the current page (what the table shows)
+  let ordersPage = 1;
+  let ordersServerPaging = null; // Set by the first response: true when the API paginates
+  let ordersRequestId = 0;
 
   // Normalize fulfillment status to only: fulfilled, unfulfilled, partial
   function normalizeStatus(status) {
@@ -226,10 +234,27 @@
     };
   }
 
+  function getOrderFilters() {
+    return {
+      search: document.getElementById('orders-search').value.toLowerCase().trim(),
+      status: document.getElementById('orders-filter-status').value,
+      days: document.getElementById('orders-filter-date').value
+    };
+  }
+
   function applyOrderFilters() {
-    const searchTerm = document.getElementById('orders-search').value.toLowerCase().trim();
-    const statusFilter = document.getElementById('orders-filter-status').value;
-    const dateFilter = document.getElementById('orders-filter-date').value;
+    // Paginated API filters server-side, so fetch the first matching page
+    if (ordersServerPaging) {
+      loadOrders(1);
+      return;
+    }
+
+    filterOrdersLocally();
+    showClientOrdersPage(1);
+  }
+
+  function filterOrdersLocally() {
+    const { search: searchTerm, status: statusFilter, days: dateFilter } = getOrderFilters();
 
     filteredOrdersData = ordersData.filter(order => {
       // Search filter
@@ -268,25 +293,62 @@
 
       return true;
     });
-
-    renderOrdersTable(filteredOrdersData);
-    updateOrderFilterCount();
   }
 
-  function updateOrderFilterCount() {
-    const countEl = document.getElementById('orders-filter-count');
-    const total = ordersData.length;
-    const filtered = filteredOrdersData.length;
-
-    if (filtered === total) {
-      countEl.textContent = `Showing all ${total} orders`;
+  function goToOrdersPage(page) {
+    if (ordersServerPaging) {
+      loadOrders(page);
     } else {
-      countEl.textContent = `Showing ${filtered} of ${total} orders`;
+      showClientOrdersPage(page);
+    }
+    document.getElementById('orders-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // Fallback when the API returns every order: slice the filtered list in the browser
+  function showClientOrdersPage(page) {
+    const totalCount = filteredOrdersData.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / ORDERS_PAGE_SIZE));
+    const currentPage = Math.min(Math.max(1, page), totalPages);
+    const start = (currentPage - 1) * ORDERS_PAGE_SIZE;
+
+    renderOrdersPage(
+      filteredOrdersData.slice(start, start + ORDERS_PAGE_SIZE),
+      { page: currentPage, pageSize: ORDERS_PAGE_SIZE, totalPages, totalCount },
+      ordersData.length
+    );
+  }
+
+  function renderOrdersPage(orders, pagination, overallCount) {
+    pageOrders = orders;
+    ordersPage = pagination.page;
+
+    renderOrdersTable(orders);
+    updateOrderFilterCount(pagination, overallCount);
+    renderDashboardPagination(document.getElementById('orders-pagination'), pagination.page, pagination.totalPages, goToOrdersPage);
+  }
+
+  function updateOrderFilterCount(pagination, overallCount) {
+    const countEl = document.getElementById('orders-filter-count');
+    const { page, pageSize, totalCount } = pagination;
+
+    if (totalCount === 0) {
+      countEl.textContent = `Showing 0 of ${overallCount} orders`;
+      return;
+    }
+
+    const first = (page - 1) * pageSize + 1;
+    const last = Math.min(page * pageSize, totalCount);
+    const range = (first === 1 && last === totalCount) ? `all ${totalCount}` : `${first}–${last} of ${totalCount}`;
+
+    if (totalCount === overallCount) {
+      countEl.textContent = `Showing ${range} orders`;
+    } else {
+      countEl.textContent = `Showing ${range} matching orders (${overallCount} total)`;
     }
   }
 
   function showOrderDetails(orderIndex) {
-    const order = ordersData[orderIndex];
+    const order = pageOrders[orderIndex];
     if (!order) return;
 
     const container = document.getElementById('orders-container');
@@ -461,13 +523,11 @@
       return;
     }
 
-    orders.forEach((order) => {
-      // Find the original index in ordersData for the detail view
-      const originalIndex = ordersData.findIndex(o => o.orderName === order.orderName);
+    orders.forEach((order, index) => {
       const row = document.createElement('tr');
 
       row.innerHTML = `
-        <td><a href="#" class="order-link" data-order-index="${originalIndex}"><strong>${escapeHtml(order.orderName || order.orderNumber)}</strong></a></td>
+        <td><a href="#" class="order-link" data-order-index="${index}"><strong>${escapeHtml(order.orderName || order.orderNumber)}</strong></a></td>
         <td>${escapeHtml(order.customer || 'N/A')}</td>
         <td>${escapeHtml(order.email || 'N/A')}</td>
         <td>${formatDate(order.date)}</td>
@@ -492,32 +552,46 @@
     addTrackingButtonHandlers();
   }
 
-  async function loadOrders() {
+  async function loadOrders(page = 1) {
     const customerId = {{ customer.id | json }};
     const isExtendedManager = {{ is_extended_manager | default: false | json }};
     const loadingEl = document.getElementById('orders-loading');
     const errorEl = document.getElementById('orders-error');
     const containerEl = document.getElementById('orders-container');
     const emptyEl = document.getElementById('orders-empty');
-    const tableBody = document.getElementById('orders-table-body');
+    const tableEl = document.getElementById('orders-table');
+    const requestId = ++ordersRequestId;
+    const isFirstLoad = ordersServerPaging === null;
 
     try {
-      loadingEl.style.display = 'block';
       errorEl.style.display = 'none';
-      containerEl.style.display = 'none';
-      emptyEl.style.display = 'none';
+      if (isFirstLoad) {
+        loadingEl.style.display = 'block';
+        containerEl.style.display = 'none';
+        emptyEl.style.display = 'none';
+      } else {
+        // Keep the current page (and the filter inputs) visible while the next one loads
+        tableEl.classList.add('is-loading');
+      }
 
-      // Extended managers get all GFS - USCIS orders
-      const apiUrl = isExtendedManager
-        ? `${API_ENDPOINT}?customerId=${customerId}&extended=true`
-        : `${API_ENDPOINT}?customerId=${customerId}`;
-      const response = await fetch(apiUrl);
+      // Extended managers get all orders for their company tag
+      const filters = getOrderFilters();
+      const params = new URLSearchParams({ customerId, page, pageSize: ORDERS_PAGE_SIZE });
+      if (isExtendedManager) params.set('extended', 'true');
+      if (filters.search) params.set('search', filters.search);
+      if (filters.status) params.set('status', filters.status);
+      if (filters.days) params.set('days', filters.days);
+
+      const response = await fetch(`${API_ENDPOINT}?${params}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
+
+      // A newer page or filter request was made while this one was in flight
+      if (requestId !== ordersRequestId) return;
 
       loadingEl.style.display = 'none';
 
@@ -527,7 +601,9 @@
         return;
       }
 
-      if (!data.orders || data.orders.length === 0) {
+      // orderCount is the company's unfiltered total, so 0 means no orders at all
+      if (!data.orders || !data.orderCount) {
+        containerEl.style.display = 'none';
         emptyEl.style.display = 'block';
         return;
       }
@@ -535,20 +611,28 @@
       document.getElementById('company-name').textContent = data.companyTag || 'N/A';
       document.getElementById('total-orders').textContent = data.orderCount || 0;
 
-      ordersData = data.orders;
-      filteredOrdersData = data.orders;
-
-      renderOrdersTable(filteredOrdersData);
-      updateOrderFilterCount();
+      if (data.pagination) {
+        ordersServerPaging = true;
+        renderOrdersPage(data.orders, data.pagination, data.orderCount);
+      } else {
+        // API without pagination support returned every order: page through them here
+        ordersServerPaging = false;
+        ordersData = data.orders;
+        filterOrdersLocally();
+        showClientOrdersPage(page);
+      }
 
       containerEl.style.display = 'block';
 
     } catch (error) {
+      if (requestId !== ordersRequestId) return;
       console.error('Error loading orders:', error);
       loadingEl.style.display = 'none';
       errorEl.style.display = 'block';
       document.getElementById('orders-error-message').textContent =
         'Failed to load orders. Please check that your API endpoint is configured correctly.';
+    } finally {
+      if (requestId === ordersRequestId) tableEl.classList.remove('is-loading');
     }
   }
 
