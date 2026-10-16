@@ -388,20 +388,79 @@
     background: #fafafa;
   }
 
-  .location-row-header {
+  .location-accordion-trigger {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
+    gap: 12px;
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+  }
+
+  .location-row--open .location-accordion-trigger {
     padding-bottom: 14px;
     border-bottom: 1px solid #ececec;
+  }
+
+  /* Plus icon that becomes a minus when the row is open. */
+  .location-accordion-icon {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    flex: none;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+  }
+
+  .location-accordion-icon::before,
+  .location-accordion-icon::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    background: #555;
+  }
+
+  .location-accordion-icon::before {
+    width: 11px;
+    height: 2px;
+    transform: translate(-50%, -50%);
+  }
+
+  .location-accordion-icon::after {
+    width: 2px;
+    height: 11px;
+    transform: translate(-50%, -50%);
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+
+  .location-row--open .location-accordion-icon::after {
+    transform: translate(-50%, -50%) rotate(90deg);
+    opacity: 0;
+  }
+
+  .location-row-body {
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .location-row--open .location-row-body {
+    display: flex;
   }
 
   .location-row-controls {
     display: flex;
     align-items: center;
-    gap: 20px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 16px 20px;
   }
 
   .locations-search {
@@ -562,8 +621,8 @@
       grid-template-columns: 1fr;
     }
 
-    .location-row-header {
-      align-items: flex-start;
+    .location-row-controls {
+      justify-content: flex-start;
     }
 
     .location-address-fields {
@@ -914,19 +973,40 @@
       actions.appendChild(saveBtn);
       actions.appendChild(status);
 
-      // Top row: name on the left, Card Payment toggle + Save on the right
-      const header = document.createElement('div');
-      header.className = 'location-row-header';
+      // Accordion trigger: plus icon + location name. Collapsed by default; each row
+      // toggles independently so several can be open at once.
+      const trigger = document.createElement('button');
+      trigger.type = 'button';
+      trigger.className = 'location-accordion-trigger';
+      trigger.setAttribute('aria-expanded', 'false');
+      const icon = document.createElement('span');
+      icon.className = 'location-accordion-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      trigger.appendChild(icon);
+      trigger.appendChild(nameEl);
+
+      // Collapsible body: Card Payment toggle + Save on top, then the address fields.
+      const body = document.createElement('div');
+      body.className = 'location-row-body';
+      const bodyId = 'location-body-' + i;
+      body.id = bodyId;
+      trigger.setAttribute('aria-controls', bodyId);
+
       const controls = document.createElement('div');
       controls.className = 'location-row-controls';
       controls.appendChild(toggle);
       controls.appendChild(actions);
-      header.appendChild(nameEl);
-      header.appendChild(controls);
 
-      // Bottom row: the address fields
-      row.appendChild(header);
-      row.appendChild(addrWrap);
+      body.appendChild(controls);
+      body.appendChild(addrWrap);
+
+      trigger.addEventListener('click', function () {
+        const open = row.classList.toggle('location-row--open');
+        trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+
+      row.appendChild(trigger);
+      row.appendChild(body);
       list.appendChild(row);
     });
 
