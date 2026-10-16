@@ -11,6 +11,7 @@
   {%- assign has_manager_tag = false -%}
   {%- assign has_extended_tag = false -%}
   {%- assign has_target_tag = false -%}
+  {%- assign has_ssc_tag = false -%}
   {%- for tag in customer.tags -%}
     {%- assign tag_lower = tag | downcase | strip -%}
     {%- if tag_lower == 'limit' -%}
@@ -30,6 +31,9 @@
     {%- endif -%}
     {%- if tag_lower == 'target hospitality' -%}
       {%- assign has_target_tag = true -%}
+    {%- endif -%}
+    {%- if tag_lower == 'ssc' -%}
+      {%- assign has_ssc_tag = true -%}
     {%- endif -%}
   {%- endfor -%}
   {%- if has_limit_tag -%}
@@ -71,6 +75,8 @@
   {%- assign customer_company_slug = 'akima' -%}
 {%- elsif has_target_tag -%}
   {%- assign customer_company_slug = 'target-hospitality' -%}
+{%- elsif has_ssc_tag -%}
+  {%- assign customer_company_slug = 'ssc' -%}
 {%- else -%}
   {%- for tag in customer.tags -%}
     {%- assign tag_lower = tag | downcase | strip -%}

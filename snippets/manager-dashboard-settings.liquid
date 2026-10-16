@@ -29,6 +29,8 @@
   {%- elsif customer_tags_lower contains 'target hospitality' -%}
     {%- assign is_target_manager = true -%}
     {%- assign company_slug = 'target-hospitality' -%}
+  {%- elsif customer_tags_lower contains 'ssc' -%}
+    {%- assign company_slug = 'ssc' -%}
   {%- endif -%}
 {%- endif -%}
 
@@ -48,6 +50,7 @@
       {%- elsif company_slug == 'akima' -%}Akima - Company Settings
       {%- elsif company_slug == 'gfs-uscis' -%}GFS USCIS - Company Settings
       {%- elsif company_slug == 'target-hospitality' -%}Target Hospitality - Company Settings
+      {%- elsif company_slug == 'ssc' -%}SSC - Company Settings
       {%- else -%}Company Settings
       {%- endif -%}
     </h2>
@@ -668,9 +671,12 @@
   });
 
   async function loadGlobalSettings() {
+    // Never fall back to the no-company default: without a resolved company the
+    // API returns another company's record (e.g. an unmapped tag showing GFS's
+    // data). If we can't identify the company, load nothing.
+    if (!companyId) return;
     try {
-      var url = `${SETTINGS_API_BASE}/get-global-settings`;
-      if (companyId) url += '?company=' + encodeURIComponent(companyId);
+      var url = `${SETTINGS_API_BASE}/get-global-settings?company=` + encodeURIComponent(companyId);
       const response = await fetch(url);
       const data = await response.json();
 
