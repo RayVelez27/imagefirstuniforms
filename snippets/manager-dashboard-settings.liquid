@@ -250,7 +250,14 @@
         <span id="notifications-error" class="section-error" style="display: none;"></span>
       </div>
     </div>
+    {%- endunless -%}
 
+    {%- comment -%}
+      Global PO Number is available to Target Hospitality managers too (the cart
+      auto-fills the PO from globalPO for TH customers), so it is guarded separately
+      and only excluded for BLS and Akima.
+    {%- endcomment -%}
+    {%- unless is_bls_manager or is_akima_manager -%}
     <div class="settings-section">
       <h3 class="settings-section-title">Global PO Number</h3>
       <p class="settings-section-description">This PO number will be applied to all company orders.</p>
