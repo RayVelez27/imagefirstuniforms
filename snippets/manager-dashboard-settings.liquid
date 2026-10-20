@@ -199,7 +199,7 @@
   { "name": "TH - General - Permian Regional Office", "address": "12308 W Hwy 80 E", "city": "Odessa", "state": "TX", "zip": "79765", "country": "US" },
   { "name": "TH - General - Mountain West", "address": "4360 Rim Rock Road", "city": "Winnemucca", "state": "NV", "zip": "89445", "country": "US" },
   { "name": "TH - General - North Texas", "company": "North Texas Regional Office", "address": "7583 FM1949", "city": "Vernon", "state": "TX", "zip": "76384", "country": "US" },
-  { "name": "TH - Hospitality - Big Spring Lodge", "address": "5101 E. Midway Road", "city": "Big Spring", "state": "TX", "zip": "79720", "country": "US" },
+  { "name": "TH - Hospitality - Big Spring Lodge", "address": "5101 E. Midway Road", "city": "Big Spring", "state": "TX", "zip": "79720", "country": "US", "cardPaymentDisabled": true },
   { "name": "TH - Hospitality - Carlsbad Lodge", "address": "4018 Iron Horse Drive", "city": "Carlsbad", "state": "NM", "zip": "88220", "country": "US" },
   { "name": "TH - Hospitality - Cheecham Lodge", "address": "PO Box 5447", "city": "Fort McMurray", "state": "Alberta", "zip": "T9H 3G4", "country": "CA" },
   { "name": "TH - Hospitality - Jal Lodge", "address": "218 Whitworth Drive", "city": "Jal", "state": "NM", "zip": "88252", "country": "US" },
@@ -560,6 +560,11 @@
     color: #d32f2f;
   }
 
+  .location-card-note {
+    font-size: 13px;
+    color: #666;
+  }
+
   .location-name {
     font-weight: 600;
     font-size: 15px;
@@ -875,7 +880,10 @@
         zip: d.zip || '',
         country: d.country || '',
         phone: d.phone || '',
-        cardPayment: true
+        // cardPaymentDisabled (set in the defaults block) removes the Card Payment
+        // toggle and keeps the location Pay Later only, whatever was saved before.
+        cardPaymentDisabled: d.cardPaymentDisabled === true,
+        cardPayment: d.cardPaymentDisabled !== true
       };
     });
 
@@ -948,25 +956,32 @@
 
       addrWrap.appendChild(fieldsGrid);
 
-      const toggle = document.createElement('label');
-      toggle.className = 'card-toggle';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.className = 'location-card-payment';
-      cb.checked = !!loc.cardPayment;
-      // Capture the toggle into state the moment it changes, so a re-render (e.g. the
-      // async settings load) can't reset it back to the default before the row is saved.
-      cb.addEventListener('change', function () {
-        if (locationsState[i]) locationsState[i].cardPayment = cb.checked;
-      });
-      const slider = document.createElement('span');
-      slider.className = 'card-toggle__slider';
-      const tlabel = document.createElement('span');
-      tlabel.className = 'card-toggle__label';
-      tlabel.textContent = 'Card Payment';
-      toggle.appendChild(cb);
-      toggle.appendChild(slider);
-      toggle.appendChild(tlabel);
+      let toggle;
+      if (loc.cardPaymentDisabled) {
+        toggle = document.createElement('span');
+        toggle.className = 'location-card-note';
+        toggle.textContent = 'Card payment not available (Pay Later only)';
+      } else {
+        toggle = document.createElement('label');
+        toggle.className = 'card-toggle';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'location-card-payment';
+        cb.checked = !!loc.cardPayment;
+        // Capture the toggle into state the moment it changes, so a re-render (e.g. the
+        // async settings load) can't reset it back to the default before the row is saved.
+        cb.addEventListener('change', function () {
+          if (locationsState[i]) locationsState[i].cardPayment = cb.checked;
+        });
+        const slider = document.createElement('span');
+        slider.className = 'card-toggle__slider';
+        const tlabel = document.createElement('span');
+        tlabel.className = 'card-toggle__label';
+        tlabel.textContent = 'Card Payment';
+        toggle.appendChild(cb);
+        toggle.appendChild(slider);
+        toggle.appendChild(tlabel);
+      }
 
       const actions = document.createElement('div');
       actions.className = 'location-row-actions';
@@ -1073,7 +1088,7 @@
         if (typeof o.phone === 'string') loc.phone = o.phone;
         // Legacy single-line saves (shippingAddress) fall back into the Address field
         if (o.address == null && typeof o.shippingAddress === 'string') loc.address = o.shippingAddress;
-        if (typeof o.cardPayment === 'boolean') loc.cardPayment = o.cardPayment;
+        if (typeof o.cardPayment === 'boolean' && !loc.cardPaymentDisabled) loc.cardPayment = o.cardPayment;
       }
     });
 
@@ -1100,7 +1115,8 @@
       locationsState[i].zip = row.querySelector('.location-zip-input').value;
       locationsState[i].country = row.querySelector('.location-country-input').value;
       locationsState[i].phone = row.querySelector('.location-phone-input').value;
-      locationsState[i].cardPayment = row.querySelector('.location-card-payment').checked;
+      const cardEl = row.querySelector('.location-card-payment');
+      locationsState[i].cardPayment = cardEl ? cardEl.checked : false;
     });
   }
 
@@ -1119,7 +1135,7 @@
         zip: loc.zip,
         country: loc.country,
         phone: loc.phone,
-        cardPayment: loc.cardPayment
+        cardPayment: loc.cardPaymentDisabled ? false : loc.cardPayment
       };
     });
     return out;
