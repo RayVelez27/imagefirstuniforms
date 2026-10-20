@@ -180,7 +180,7 @@
     {%- if show_target_locations -%}
     <div class="settings-section" id="locations-settings-section">
       <h3 class="settings-section-title">Locations</h3>
-      <p class="settings-section-description">Billing uses the universal Global Billing Address above. Set each location&rsquo;s full shipping address and toggle Card Payment on or off, then save that location.</p>
+      <p class="settings-section-description">Billing uses the universal Global Billing Address above. Set each location&rsquo;s PO Number and full shipping address and toggle Card Payment on or off, then save that location.</p>
 
       <div class="locations-search">
         <input type="text" id="locations-search-input" class="locations-search-input" placeholder="Search locations by name, city, state&hellip;" aria-label="Search locations" autocomplete="off">
@@ -258,11 +258,11 @@
     {%- endunless -%}
 
     {%- comment -%}
-      Global PO Number is available to Target Hospitality managers too (the cart
-      auto-fills the PO from globalPO for TH customers), so it is guarded separately
-      and only excluded for BLS and Akima.
+      Global PO Number is guarded separately from Email Notifications. Target
+      Hospitality managers don't get it: each TH location has its own PO Number in
+      the Locations section above, and the cart fills the PO from the pinned location.
     {%- endcomment -%}
-    {%- unless is_bls_manager or is_akima_manager -%}
+    {%- unless is_bls_manager or is_akima_manager or is_target_manager -%}
     <div class="settings-section">
       <h3 class="settings-section-title">Global PO Number</h3>
       <p class="settings-section-description">This PO number will be applied to all company orders.</p>
@@ -820,7 +820,7 @@
   }
 
   // ===== Target Locations =====
-  // In-memory state: [{ name, address, city, state, zip, cardPayment }]. Seeded
+  // In-memory state: [{ name, poNumber, address, city, state, zip, cardPayment }]. Seeded
   // from the defaults <script> block; overridden by saved settings
   // (settings.locationsJson) on load. Billing is universal (Global Billing
   // Address); shipping is per-location, split into full address fields.
@@ -864,6 +864,7 @@
     locationsState = defaults.map(function (d) {
       return {
         name: d.name,
+        poNumber: d.poNumber || '',
         firstName: d.firstName || '',
         lastName: d.lastName || '',
         company: d.company || '',
@@ -933,6 +934,7 @@
         return field;
       }
 
+      addField('PO Number', 'location-po-input', loc.poNumber, 'location-field--full');
       addField('First Name', 'location-first-input', loc.firstName, 'location-field--span3');
       addField('Last Name', 'location-last-input', loc.lastName, 'location-field--span3');
       addField('Company', 'location-company-input', loc.company, 'location-field--full');
@@ -1058,6 +1060,7 @@
     locationsState.forEach(function (loc) {
       const o = overrides[loc.name];
       if (o && typeof o === 'object') {
+        if (typeof o.poNumber === 'string') loc.poNumber = o.poNumber;
         if (typeof o.firstName === 'string') loc.firstName = o.firstName;
         if (typeof o.lastName === 'string') loc.lastName = o.lastName;
         if (typeof o.company === 'string') loc.company = o.company;
@@ -1086,6 +1089,7 @@
     list.querySelectorAll('.location-row').forEach(function (row) {
       const i = parseInt(row.dataset.index, 10);
       if (isNaN(i) || !locationsState[i]) return;
+      locationsState[i].poNumber = row.querySelector('.location-po-input').value;
       locationsState[i].firstName = row.querySelector('.location-first-input').value;
       locationsState[i].lastName = row.querySelector('.location-last-input').value;
       locationsState[i].company = row.querySelector('.location-company-input').value;
@@ -1104,6 +1108,7 @@
     const out = {};
     locationsState.forEach(function (loc) {
       out[loc.name] = {
+        poNumber: loc.poNumber,
         firstName: loc.firstName,
         lastName: loc.lastName,
         company: loc.company,

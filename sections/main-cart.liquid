@@ -1743,9 +1743,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
       if (data.settings) {
         globalSettings = data.settings;
-        // Pre-populate PO Number field
+        // Pre-populate PO Number field. Target Hospitality uses a PO per location
+        // instead (applyPinnedLocationPO), so the company-wide PO is skipped for TH.
         var poField = document.getElementById('cart-po-number');
-        if (poField && globalSettings.globalPO) {
+        if (poField && globalSettings.globalPO && !isTargetCustomer) {
           poField.value = globalSettings.globalPO;
           // Update cart attribute
           if (typeof window.updateCartAttribute === 'function') {
@@ -1892,8 +1893,21 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       if (!pinnedLocation) return;
       applyPinnedLocationCard();
+      applyPinnedLocationPO();
     } catch (e) {
       console.error('Error loading pinned location:', e);
+    }
+  }
+
+  // Fill the PO Number from the pinned location's PO (set per location in the
+  // Manager Dashboard). TH customers only; a location without a PO leaves the field as is.
+  function applyPinnedLocationPO() {
+    if (!pinnedLocation || !isTargetCustomer || !pinnedLocation.poNumber) return;
+    var poField = document.getElementById('cart-po-number');
+    if (!poField) return;
+    poField.value = pinnedLocation.poNumber;
+    if (typeof window.updateCartAttribute === 'function') {
+      window.updateCartAttribute('attributes[PO Number]', pinnedLocation.poNumber);
     }
   }
 
