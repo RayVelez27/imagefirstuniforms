@@ -561,20 +561,29 @@
                   >{{ cart.note }}</textarea>
                 </div>
 
-                {%- unless is_bulk_order_customer or has_akima_tag or is_target_manager_extended -%}
+                {%- comment -%}Target Hospitality shoppers (managers included) type their own PO here; it is required.{%- endcomment -%}
+                {%- assign po_readonly = false -%}
+                {%- if is_limited_customer and has_target_tag == false -%}
+                  {%- assign po_readonly = true -%}
+                {%- endif -%}
+                {%- unless is_bulk_order_customer or has_akima_tag -%}
                 <div class="cart-attributes__field cart-attributes__field--po">
                   <label class="cart-attributes__label" for="cart-po-number">
-                    PO Number{% if is_limited_customer %} <span class="cart-attributes__readonly-badge">(Auto-filled)</span>{% endif %}
+                    PO Number{% if has_target_tag %} <span class="cart-attributes__required">(required for Pay Later)</span>{% elsif po_readonly %} <span class="cart-attributes__readonly-badge">(Auto-filled)</span>{% endif %}
                   </label>
                   <input
                     type="text"
                     id="cart-po-number"
                     name="attributes[PO Number]"
-                    class="cart-attributes__input{% if is_limited_customer %} cart-attributes__input--readonly{% endif %}"
+                    class="cart-attributes__input{% if po_readonly %} cart-attributes__input--readonly{% endif %}"
                     value="{{ cart.attributes['PO Number'] }}"
                     placeholder="Enter your PO number"
-                    {% if is_limited_customer %}readonly{% endif %}
+                    {% if po_readonly %}readonly{% endif %}
+                    {% if has_target_tag %}aria-describedby="cart-po-number-error"{% endif %}
                   >
+                  {%- if has_target_tag -%}
+                  <span id="cart-po-number-error" class="cart-attributes__error" role="alert" hidden>Please enter a PO Number to use Pay Later.</span>
+                  {%- endif -%}
                 </div>
                 {%- endunless -%}
 
@@ -670,6 +679,29 @@
                 outline: none;
                 box-shadow: none;
                 border-color: #ddd;
+              }
+
+              .cart-attributes__required {
+                font-weight: 400;
+                font-size: 0.75rem;
+                color: #c0392b;
+                text-transform: none;
+                letter-spacing: normal;
+              }
+
+              .cart-attributes__error {
+                display: block;
+                margin-top: 0.35rem;
+                font-size: 0.8125rem;
+                color: #c0392b;
+              }
+
+              .cart-attributes__error[hidden] {
+                display: none;
+              }
+
+              .cart-attributes__input--invalid {
+                border-color: #c0392b;
               }
 
               .cart-attributes__readonly-badge {
@@ -1743,8 +1775,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
       if (data.settings) {
         globalSettings = data.settings;
-        // Pre-populate PO Number field. Target Hospitality uses a PO per location
-        // instead (applyPinnedLocationPO), so the company-wide PO is skipped for TH.
+        // Pre-populate PO Number field. Target Hospitality shoppers type their own
+        // PO in the cart (required), so the company-wide PO is skipped for TH.
         var poField = document.getElementById('cart-po-number');
         if (poField && globalSettings.globalPO && !isTargetCustomer) {
           poField.value = globalSettings.globalPO;
@@ -1904,21 +1936,8 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       if (!pinnedLocation) return;
       applyPinnedLocationCard();
-      applyPinnedLocationPO();
     } catch (e) {
       console.error('Error loading pinned location:', e);
-    }
-  }
-
-  // Fill the PO Number from the pinned location's PO (set per location in the
-  // Manager Dashboard). TH customers only; a location without a PO leaves the field as is.
-  function applyPinnedLocationPO() {
-    if (!pinnedLocation || !isTargetCustomer || !pinnedLocation.poNumber) return;
-    var poField = document.getElementById('cart-po-number');
-    if (!poField) return;
-    poField.value = pinnedLocation.poNumber;
-    if (typeof window.updateCartAttribute === 'function') {
-      window.updateCartAttribute('attributes[PO Number]', pinnedLocation.poNumber);
     }
   }
 
@@ -2010,8 +2029,47 @@ document.addEventListener('DOMContentLoaded', function() {
   // Resolve any pinned location collection and apply its card-payment rule
   initPinnedLocation();
 
+  // Target Hospitality: the PO Number must be typed in the cart before Pay Later.
+  // Pay Now / express checkout don't need one. Returns true when the order may proceed.
+  function requireTargetPO() {
+    if (!isTargetCustomer) return true;
+    var poField = document.getElementById('cart-po-number');
+    if (!poField) return true;
+    var ok = poField.value.trim() !== '';
+    var err = document.getElementById('cart-po-number-error');
+    if (err) err.hidden = ok;
+    poField.classList.toggle('cart-attributes__input--invalid', !ok);
+    poField.setAttribute('aria-invalid', ok ? 'false' : 'true');
+    if (!ok) {
+      if (poField.scrollIntoView) poField.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      poField.focus({ preventScroll: true });
+    }
+    return ok;
+  }
+
+  (function initTargetPO() {
+    if (!isTargetCustomer) return;
+    var poField = document.getElementById('cart-po-number');
+    if (!poField) return;
+    poField.addEventListener('input', function () {
+      if (poField.value.trim() !== '') {
+        var err = document.getElementById('cart-po-number-error');
+        if (err) err.hidden = true;
+        poField.classList.remove('cart-attributes__input--invalid');
+        poField.setAttribute('aria-invalid', 'false');
+      }
+    });
+    // Save the typed PO as soon as the field is left (the input handler debounces 1s).
+    poField.addEventListener('change', function () {
+      if (typeof window.updateCartAttribute === 'function') {
+        window.updateCartAttribute('attributes[PO Number]', poField.value);
+      }
+    });
+  })();
+
   if (payLaterBtn) {
     payLaterBtn.addEventListener('click', function() {
+      if (!requireTargetPO()) return;
       payLaterModal.classList.add('active');
       loadCartData();
       // Auto-populate shipping email for limited, Manager+Extended, and Target Hospitality customers
@@ -2105,6 +2163,11 @@ document.addEventListener('DOMContentLoaded', function() {
   if (payLaterForm) {
     payLaterForm.addEventListener('submit', function(e) {
       e.preventDefault();
+
+      if (!requireTargetPO()) {
+        payLaterModal.classList.remove('active');
+        return;
+      }
 
       if (!selectedShippingMethod) {
         showShippingMessage('Please select a shipping method before submitting.', 'error');
