@@ -569,7 +569,7 @@
                 {%- unless is_bulk_order_customer or has_akima_tag -%}
                 <div class="cart-attributes__field cart-attributes__field--po">
                   <label class="cart-attributes__label" for="cart-po-number">
-                    PO Number{% if has_target_tag %} <span class="cart-attributes__required" aria-hidden="true">*</span>{% elsif po_readonly %} <span class="cart-attributes__readonly-badge">(Auto-filled)</span>{% endif %}
+                    PO Number{% if has_target_tag %} <span class="cart-attributes__required">(required for Pay Later)</span>{% elsif po_readonly %} <span class="cart-attributes__readonly-badge">(Auto-filled)</span>{% endif %}
                   </label>
                   <input
                     type="text"
@@ -579,10 +579,10 @@
                     value="{{ cart.attributes['PO Number'] }}"
                     placeholder="Enter your PO number"
                     {% if po_readonly %}readonly{% endif %}
-                    {% if has_target_tag %}required aria-required="true" aria-describedby="cart-po-number-error"{% endif %}
+                    {% if has_target_tag %}aria-describedby="cart-po-number-error"{% endif %}
                   >
                   {%- if has_target_tag -%}
-                  <span id="cart-po-number-error" class="cart-attributes__error" role="alert" hidden>Please enter a PO Number before placing your order.</span>
+                  <span id="cart-po-number-error" class="cart-attributes__error" role="alert" hidden>Please enter a PO Number to use Pay Later.</span>
                   {%- endif -%}
                 </div>
                 {%- endunless -%}
@@ -682,7 +682,11 @@
               }
 
               .cart-attributes__required {
+                font-weight: 400;
+                font-size: 0.75rem;
                 color: #c0392b;
+                text-transform: none;
+                letter-spacing: normal;
               }
 
               .cart-attributes__error {
@@ -2025,8 +2029,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // Resolve any pinned location collection and apply its card-payment rule
   initPinnedLocation();
 
-  // Target Hospitality: the PO Number must be typed in the cart before Pay Now,
-  // Pay Later or express checkout. Returns true when the order may proceed.
+  // Target Hospitality: the PO Number must be typed in the cart before Pay Later.
+  // Pay Now / express checkout don't need one. Returns true when the order may proceed.
   function requireTargetPO() {
     if (!isTargetCustomer) return true;
     var poField = document.getElementById('cart-po-number');
@@ -2043,20 +2047,6 @@ document.addEventListener('DOMContentLoaded', function() {
     return ok;
   }
 
-  // Express checkout buttons (Shop Pay, Apple Pay...) are rendered by Shopify and
-  // can't be intercepted, so they stay disabled until a PO is typed.
-  function syncTargetExpressCheckout() {
-    if (!isTargetCustomer) return;
-    var poField = document.getElementById('cart-po-number');
-    if (!poField) return;
-    var ok = poField.value.trim() !== '';
-    document.querySelectorAll('.additional-checkout-buttons').forEach(function (el) {
-      el.style.pointerEvents = ok ? '' : 'none';
-      el.style.opacity = ok ? '' : '0.5';
-      el.title = ok ? '' : 'Enter a PO Number to continue';
-    });
-  }
-
   (function initTargetPO() {
     if (!isTargetCustomer) return;
     var poField = document.getElementById('cart-po-number');
@@ -2068,19 +2058,12 @@ document.addEventListener('DOMContentLoaded', function() {
         poField.classList.remove('cart-attributes__input--invalid');
         poField.setAttribute('aria-invalid', 'false');
       }
-      syncTargetExpressCheckout();
     });
     // Save the typed PO as soon as the field is left (the input handler debounces 1s).
     poField.addEventListener('change', function () {
       if (typeof window.updateCartAttribute === 'function') {
         window.updateCartAttribute('attributes[PO Number]', poField.value);
       }
-    });
-    syncTargetExpressCheckout();
-    document.querySelectorAll('.cart__checkout-button').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        if (!requireTargetPO()) { e.preventDefault(); e.stopImmediatePropagation(); }
-      }, true);
     });
   })();
 
