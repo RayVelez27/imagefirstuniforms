@@ -36,7 +36,7 @@
     {%- if tag_lower == 'ssc' -%}
       {%- assign has_ssc_tag = true -%}
     {%- endif -%}
-    {%- if tag_lower == 'huffmaster' -%}
+    {%- if tag_lower contains 'huffmaster' -%}
       {%- assign has_huffmaster_tag = true -%}
     {%- endif -%}
   {%- endfor -%}
@@ -1773,11 +1773,20 @@ document.addEventListener('DOMContentLoaded', function() {
   async function loadGlobalSettings() {
     if (!isLimitedCustomer && !isManagerExtended && !isTargetCustomer) return;
 
+    // Never fall back to the no-company default: without a resolved company the
+    // API returns another company's record (GFS's), leaking its PO and billing
+    // address into this cart. If we can't identify the company, load nothing.
+    if (!customerCompany) {
+      clearAutoFilledPO();
+      return;
+    }
+
     try {
-      var url = 'https://image-first-portal.netlify.app/.netlify/functions/get-global-settings';
-      if (customerCompany) url += '?company=' + encodeURIComponent(customerCompany);
+      var url = 'https://image-first-portal.netlify.app/.netlify/functions/get-global-settings?company=' + encodeURIComponent(customerCompany);
       var response = await fetch(url);
       var data = await response.json();
+
+      if (!data.settings || !data.settings.globalPO) clearAutoFilledPO();
 
       if (data.settings) {
         globalSettings = data.settings;
@@ -1803,6 +1812,22 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (error) {
       console.error('Error loading global settings:', error);
     }
+  }
+
+  // A read-only PO field only ever holds the company PO, so when the company has
+  // none, clear it. This also drops a PO left on the cart attribute by an
+  // earlier wrong auto-fill (e.g. another company's PO).
+  function clearAutoFilledPO() {
+    var poField = document.getElementById('cart-po-number');
+    if (!poField || !poField.readOnly || !poField.value) return;
+    poField.value = '';
+    // Posted directly (not via window.updateCartAttribute, which may not be
+    // defined yet): order submit falls back to the cart attribute when the
+    // field is empty, so the stored value must be cleared too.
+    var fd = new FormData();
+    fd.append('attributes[PO Number]', '');
+    fetch('/cart/update.js', { method: 'POST', body: fd })
+      .catch(function (e) { console.error('Error clearing PO Number:', e); });
   }
 
   // Function to auto-populate billing address for limited and Manager+Extended customers
