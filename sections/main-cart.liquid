@@ -12,6 +12,7 @@
   {%- assign has_extended_tag = false -%}
   {%- assign has_target_tag = false -%}
   {%- assign has_ssc_tag = false -%}
+  {%- assign has_huffmaster_tag = false -%}
   {%- for tag in customer.tags -%}
     {%- assign tag_lower = tag | downcase | strip -%}
     {%- if tag_lower == 'limit' -%}
@@ -34,6 +35,9 @@
     {%- endif -%}
     {%- if tag_lower == 'ssc' -%}
       {%- assign has_ssc_tag = true -%}
+    {%- endif -%}
+    {%- if tag_lower == 'huffmaster' -%}
+      {%- assign has_huffmaster_tag = true -%}
     {%- endif -%}
   {%- endfor -%}
   {%- if has_limit_tag -%}
@@ -77,6 +81,8 @@
   {%- assign customer_company_slug = 'target-hospitality' -%}
 {%- elsif has_ssc_tag -%}
   {%- assign customer_company_slug = 'ssc' -%}
+{%- elsif has_huffmaster_tag -%}
+  {%- assign customer_company_slug = 'huffmaster' -%}
 {%- else -%}
   {%- for tag in customer.tags -%}
     {%- assign tag_lower = tag | downcase | strip -%}
