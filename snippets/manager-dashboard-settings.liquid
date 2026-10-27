@@ -31,6 +31,8 @@
     {%- assign company_slug = 'target-hospitality' -%}
   {%- elsif customer_tags_lower contains 'ssc' -%}
     {%- assign company_slug = 'ssc' -%}
+  {%- elsif customer_tags_lower contains 'huffmaster' -%}
+    {%- assign company_slug = 'huffmaster' -%}
   {%- endif -%}
 {%- endif -%}
 
@@ -51,6 +53,7 @@
       {%- elsif company_slug == 'gfs-uscis' -%}GFS USCIS - Company Settings
       {%- elsif company_slug == 'target-hospitality' -%}Target Hospitality - Company Settings
       {%- elsif company_slug == 'ssc' -%}SSC - Company Settings
+      {%- elsif company_slug == 'huffmaster' -%}Huffmaster - Company Settings
       {%- else -%}Company Settings
       {%- endif -%}
     </h2>
