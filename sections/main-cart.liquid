@@ -1683,8 +1683,10 @@ document.addEventListener('DOMContentLoaded', function() {
   var isTargetCustomer = {{ has_target_tag | json }} === true;
 
   // Location pinned to the cart from the collection the customer ordered in (Target Hospitality).
-  // Drives credit-card availability and Pay Later shipping for this cart.
-  var pinnedLocationHandle = {{ cart.attributes['Location'] | json }};
+  // Drives credit-card availability and Pay Later shipping for this cart. Only honored
+  // for TH customers: a Location left on the cart (e.g. from browsing a TH collection)
+  // must not lock another company's shipping to a TH lodge.
+  var pinnedLocationHandle = isTargetCustomer ? {{ cart.attributes['Location'] | json }} : null;
   var pinnedLocation = null;
 
   // Global settings loaded from API (applies to all Limit users and Manager+Extended users)
@@ -1778,6 +1780,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // address into this cart. If we can't identify the company, load nothing.
     if (!customerCompany) {
       clearAutoFilledPO();
+      unlockBillingAddressFields();
       return;
     }
 
@@ -1787,6 +1790,10 @@ document.addEventListener('DOMContentLoaded', function() {
       var data = await response.json();
 
       if (!data.settings || !data.settings.globalPO) clearAutoFilledPO();
+      // Billing is locked in the markup to keep the company address fixed. With no
+      // saved company address there is nothing to lock in, and the empty required
+      // fields would block the order, so let the customer fill them in.
+      if (!data.settings || !data.settings.billingAddress) unlockBillingAddressFields();
 
       if (data.settings) {
         globalSettings = data.settings;
@@ -1884,8 +1891,8 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Remove the readonly/disabled locks from the Pay Later billing fields so the
-  // user can edit them. Only runs when a manager has turned "Lock billing
-  // address" off for the company.
+  // user can edit them. Runs when a manager has turned "Lock billing address"
+  // off for the company, or when the company has no saved billing address.
   function unlockBillingAddressFields() {
     var ids = [
       'pay-later-billing-first-name',
